@@ -1,11 +1,19 @@
-#include <iostream>
-#include <pcl/ModelCoefficients.h>
-#include <pcl/io/pcd_io.h>
-#include <pcl/point_types.h>
-#include <pcl/sample_consensus/method_types.h>
-#include <pcl/sample_consensus/model_types.h>
+#include <wall_detector/wall_detector_ros.hpp>
+#include <sstream>
+#include <filesystem>
 
-int main ()
+namespace vortex{
+namespace wall_detector{
+
+
+WallDetectorNode::WallDetectorNode(const rclcpp::NodeOptions & options) : Node("wall_detector_node", options)
+{
+
+
+
+} //Class wall detector
+
+int WallDetectorNode::detect_wall()
 {
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -45,8 +53,10 @@ int main ()
   seg.setDistanceThreshold (0.01);
 
   //Define axis for vertical planes 
-  Eigen::Vector3F axis(1.0, 0.0, 0.0); //Normal to vertical planes
-  seg.setAxis(axis);
+  Eigen::Vector3f axis;
+  axis << 1.0, 0.0, 0.0;
+
+  seg.setAxis(axis); //Axis declared in hpp file
   seg.setEpsAngle(pcl::deg2rad(10.0)); //Allow up to 10 degree deviation
 
   seg.setInputCloud (cloud);
@@ -68,6 +78,14 @@ int main ()
     std::cerr << idx << "    " << cloud->points[idx].x << " "
                                << cloud->points[idx].y << " "
                                << cloud->points[idx].z << std::endl;
+  return 0;
 
-  return (0);
-}
+} // wall detector
+
+
+
+
+
+} //namespace wall_detector
+} // namespace vortex
+
