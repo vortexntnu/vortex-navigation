@@ -23,9 +23,8 @@ set(LIB_NAME "${PROJECT_NAME}_component")
 
 #add correct modules
 add_library(${LIB_NAME} SHARED
-  src/pipeline_line_fitting_ros.cpp
-  src/randsac.cpp
-  src/linedetectorPipe.cpp
+    src/wayfinder.cpp
+    src/grid.cpp
 )
 
 target_link_libraries(${LIB_NAME} PUBLIC

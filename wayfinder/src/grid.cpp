@@ -46,6 +46,7 @@ Point Grid::getWaypoint(){
 void Grid::updateGrid(std::vector<Point> wallPoints){
     //adds inn the new wall points to the grid
     for (Point p : wallPoints){
+        //TODO
         //assuming that the points are relative to the center, we have to adjust them
         if (p.x < 0 || p.y < 0 || p.z < 0 || p.x >= grid->size() || p.y >= grid->size() || p.z >= grid->size()){
             resizeGrid();
@@ -70,6 +71,8 @@ void Grid::resizeGrid(){
     for (int x = 0; x < grid->size(); x++){
         for (int y = 0; y < grid->size(); y++){
             for (int z = 0; z < grid->size(); z++){
+
+                //is this the right way around?
                 newGrid->at(x + center.x - newCenter.x).at(y + center.y - newCenter.y).at(z + center.z - newCenter.z) = grid->at(x).at(y).at(z);
             }
         }

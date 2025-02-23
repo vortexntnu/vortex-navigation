@@ -3,6 +3,6 @@
 #include "grid.h"
 
 class WayfinderNode : public rclcpp::Node {
-
-
+    public:
+        
 };
