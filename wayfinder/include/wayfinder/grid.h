@@ -8,6 +8,11 @@ struct Point{
     int z;
 };
 
+struct GridPixel{
+    double value;
+    double depth; //dummy variable for 2.5D grid
+};
+
 struct Params{
     double sigmaX;
     double sigmaY;
@@ -23,7 +28,7 @@ class Grid{
         Params params = {20, 20, 20, 0, 0, 0};
 
         Point center;
-        std::unique_ptr<std::vector<std::vector<std::vector<double>>>> grid; //negative values are obstacles
+        std::unique_ptr<std::vector<std::vector<std::vector<GridPixel>>>> grid; //negative values are obstacles
 
         Grid(int size = 200);
         void setParams(Params newParams);
@@ -31,6 +36,6 @@ class Grid{
         Point getWaypoint(); //retives the next waypoint. 
 
     private:
-        void initGaussian(std::unique_ptr<std::vector<std::vector<std::vector<double>>>>& gaussGrid); //initializes the gaussian distribution
+        void initGaussian(std::unique_ptr<std::vector<std::vector<std::vector<GridPixel>>>>& gaussGrid); //initializes the gaussian distribution
         void resizeGrid(); //doubles the size of the grid if values fall outside the grid size
 };
