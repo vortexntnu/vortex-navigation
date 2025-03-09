@@ -33,6 +33,7 @@ class Grid{
         Grid(int size = 200);
         void setParams(Params newParams);
         void updateGrid(std::vector<Point> wallPoints); //updates the grid with new readings from the sensors
+        void seenPoints(std::vector<Point> seenPoints); //updates the grid with points that have been seen
         Point getWaypoint(); //retives the next waypoint. 
 
     private:

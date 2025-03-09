@@ -10,4 +10,5 @@ void WayfinderNode::pointCallback(const type msg){
     //extract the points from msg
     std::vector<Point> wallPoints;
     grid.updateGrid(wallPoints);
+    //also have a way to update all seen points
 }

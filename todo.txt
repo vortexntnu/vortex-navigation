@@ -1,0 +1,24 @@
+Two grids:
+double value: initiated at initGrid, based on gaussian, updated w. seen tiles
+bool walls: initiated at initGrid, wall tiles, can be replaced each update.
+the walls grid should be subject to diffusion before use as a mask.
+
+public void initGrid(const grid, const double orcaDepth, const params): 
+    - sets up grid, inherits size. 
+    - calls initGaussian for gauss values. 
+    - creates initial wall mask based on orca-depth
+
+public void update(const subGrid, const double orcaDepth): 
+    - assert sub-grid in grid. 
+    - uses orcaDepth to update wall mask (both adding and removing walls in sub-grid)
+    - sets value to 0 at all seen tiles
+
+private void initGaussian():
+    - sets values in value-grid based on the 2D gaussian function
+
+public Point getWaypoint(const orcaPos):
+    - perform dilation on walls mask: exclude all tiles that match
+    - loop through, best tile based on tileUtility calculation
+
+private double tileUtility(const double value, const double distance):
+    return value/pow(distance, localSearch)

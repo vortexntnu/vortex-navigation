@@ -77,10 +77,28 @@ void Grid::resizeGrid(){
             for (int z = 0; z < grid->size(); z++){
 
                 //is this the right way around?
-                newGrid->at(x + center.x - newCenter.x).at(y + center.y - newCenter.y).at(z + center.z - newCenter.z) = grid->at(x).at(y).at(z);
+                newGrid->at(x - center.x + newCenter.x).at(y - center.y + newCenter.y).at(z - center.z + newCenter.z) = grid->at(x).at(y).at(z);
             }
         }
     }
     grid = std::move(newGrid);
     center = newCenter;
 }
+
+void Grid::getSeenPoints(std::vector<Point>& dronePos)
+
+void Grid::seenPoints(std::vector<Point> seenPoints){
+    for (auto p : seenPoints){
+        int x = p.x + center.x;
+        int y = p.y + center.y;
+
+        if (p.x < 0 || p.y < 0 || p.z < 0 || p.x >= grid->size() || p.y >= grid->size() || p.z >= grid->size()){
+            resizeGrid();
+            //account for the new center
+            x = p.x + center.x;
+            y = p.y + center.y; 
+        }
+
+        (*grid)[x][y][0].value = 0;
+    }
+};

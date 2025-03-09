@@ -1,4 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include "grid.h"
 
@@ -13,4 +14,6 @@ class WayfinderNode : public rclcpp::Node {
         Grid grid;
 
         //void pointCallback(const type msg);
+        void positionCallback(const geometry_msgs::msg::PoseArray::SharedPtr msg);
 };
+
