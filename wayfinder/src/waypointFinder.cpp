@@ -1,7 +1,5 @@
 #include "wayfinder/waypointFinder.h"
 
-#include <cmath>
-#include <assert>
 
 double distance(const Point &p1, const Point &p2){
     return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
@@ -25,13 +23,16 @@ WaypointFinder::WaypointFinder(const std::vector<std::vector<double>> &fullGrid,
     params = newParams;
     values = std::vector<std::vector<double>>(fullGrid.size(), std::vector<double>(fullGrid[0].size(), 0));
     walls = std::vector<std::vector<bool>>(fullGrid.size(), std::vector<bool>(fullGrid[0].size(), false));
-    initGaussian();
-
-    //TODO also, update the walls and add seen points
     
+    updateGrid(fullGrid, orcaDepth);
+    
+    //update grid fixes walls, but also seen points, which we want to start with none, so we need to init gaussian after
+    initGaussian();
 }
 
 void WaypointFinder::updateGrid(const std::vector<std::vector<double>> &subGrid, const double &orcaDepth){
+    //sets seen points and walls
+
     assert(subGrid.size() <= values.size() && subGrid[0].size() <= values.size());
     for (int x = 0; x < subGrid.size(); x++){
         for (int y = 0; y < subGrid[0].size(); y++){
@@ -75,8 +76,8 @@ Point WaypointFinder::getWaypoint(){
     Point maxPoint = {params.centerX, params.centerY};
     double maxUtility = 0;
 
-    vector<vector<bool>> wallsWithBuffer;
-    dilateMask(wallsGrid, wallsWithBuffer, params.wallsMargin);
+    std::vector<std::vector<bool>> wallsWithBuffer;
+    dilateMask(walls, wallsWithBuffer, params.wallsMargin);
 
     for (int x = 0; x < values.size(); x++){
         for (int y = 0; y < values[0].size(); y++){

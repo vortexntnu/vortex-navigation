@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include <cmath>
+#include <cassert>
 
 struct Params{
     double sigmaX;
@@ -36,4 +38,5 @@ class WaypointFinder {
         void updateGrid(const std::vector<std::vector<double>> &subGrid, const double &orcaDepth);
 
         Point getWaypoint();
+
 };
