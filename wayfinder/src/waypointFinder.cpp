@@ -30,8 +30,9 @@ WaypointFinder::WaypointFinder(const Eigen::MatrixXd &fullGrid, const double &or
     initGaussian();
 }
 
-void WaypointFinder::updateGrid(const Eigen::MatrixXd &subGrid, const double &orcaDepth, const Point &offset){
+void WaypointFinder::updateGrid(const Eigen::MatrixXd &subGrid, const double &orcaDepth, const Eigen::VectorXi &aabb){
     //sets seen points and obstacles
+    Point offset = {aabb[0], aabb[2]};
 
     assert(subGrid.rows() + offset.x <= values.rows() && subGrid.cols() + offset.y <= values.cols());
 

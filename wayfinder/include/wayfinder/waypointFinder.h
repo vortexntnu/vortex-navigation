@@ -37,7 +37,7 @@ class WaypointFinder {
         WaypointFinder(){};
         WaypointFinder(const Eigen::MatrixXd &fullGrid, const double &orcaDepth, const Params &newParams);
 
-        void updateGrid(const  Eigen::MatrixXd &subGrid, const double &orcaDepth, const Point &offset);
+        void updateGrid(const  Eigen::MatrixXd &subGrid, const double &orcaDepth, const Eigen::VectorXi &aabb);
 
         Point getWaypoint();
 
