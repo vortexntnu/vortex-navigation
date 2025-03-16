@@ -1,0 +1,23 @@
+<package format="3">
+  <name>exploration_manager</name>
+  <version>0.2.0</version>
+  <description>Ros2 voxel mapping package</description>
+  <maintainer email="jorgen.fjermedal@hotmail.com">Jørgen Fjermedal</maintainer>
+  <license>MIT</license>
+
+  <depend>ament_cmake</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>message_filters</depend>
+  <depend>visualization_msgs</depend>
+  <depend>vortex_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

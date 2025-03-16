@@ -1,0 +1,25 @@
+/**:
+  ros__parameters:
+    odom_frame: "odom"
+    map_frame: "map"
+    enu_to_ned: false
+    optical_frame: "zed_left_camera_optical_frame"
+    depth_image_sub_topic: "/zed/zed_node/depth/depth_registered"
+    camera_info_sub_topic: "/zed/zed_node/depth/camera_info"
+    dvl_altitude_sub_topic: "/dvl/altitude"
+    point_cloud_pub_topic: "/voxel_cloud"
+    camera_view_visualization_pub_topic: "/camera_view"
+
+    voxel_mapping:
+      grid_resolution: 0.1
+      grid_size_x: 1000
+      grid_size_y: 1000
+      grid_size_z: 100
+      min_depth: 0.3
+      max_depth: 5.0
+      log_odds_occupied_update: 0.5
+      log_odds_free_update: -0.4
+      log_odds_min: -6.0
+      log_odds_max: 6.0
+      intensity_threshold: 3.0
+
