@@ -2,8 +2,8 @@
 #include <iostream>
 #include <vector>
 
-VoxelMapping::VoxelMapping(float resolution, uint size_x, uint size_y, uint size_z, float min_depth, float max_depth, float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max)
-    : size_x_(size_x), size_y_(size_y), size_z_(size_z), min_depth_(min_depth), max_depth_(max_depth), log_odds_occupied_(log_odds_occupied), log_odds_free_(log_odds_free), log_odds_min_(log_odds_min), log_odds_max_(log_odds_max) {
+VoxelMapping::VoxelMapping(float resolution, uint size_x, uint size_y, uint size_z, float min_depth, float max_depth, float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold)
+    : size_x_(size_x), size_y_(size_y), size_z_(size_z), min_depth_(min_depth), max_depth_(max_depth), log_odds_occupied_(log_odds_occupied), log_odds_free_(log_odds_free), log_odds_min_(log_odds_min), log_odds_max_(log_odds_max), occupancy_threshold_(occupancy_threshold), free_threshold_(free_threshold) {
     if (resolution <= 0) {
         throw std::invalid_argument("Resolution must be positive");
     }
@@ -30,7 +30,7 @@ void VoxelMapping::init_grid() {
 
     set_grid_constants_d(resolution_, size_x_, size_y_, size_z_, stream_);
     set_depth_range_d(min_depth_, max_depth_, stream_);
-    set_log_odds_properties_d(log_odds_occupied_, log_odds_free_, log_odds_min_, log_odds_max_, stream_);
+    set_log_odds_properties_d(log_odds_occupied_, log_odds_free_, log_odds_min_, log_odds_max_, occupancy_threshold_, free_threshold_, stream_);
 
     std::cout << "Voxel grid initialized on GPU with size " << size_x_ << "x" << size_y_ << "x" << size_z_ << std::endl;
 }
@@ -51,8 +51,8 @@ void VoxelMapping::set_image_size(int width, int height) {
     set_image_size_d(width, height, stream_);
 }
 
-void VoxelMapping::set_log_odds_properties(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max) {
-    set_log_odds_properties_d(log_odds_occupied, log_odds_free, log_odds_min, log_odds_max, stream_);
+void VoxelMapping::set_log_odds_properties(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold) {
+    set_log_odds_properties_d(log_odds_occupied, log_odds_free, log_odds_min, log_odds_max, occupancy_threshold, free_threshold, stream_);
 }
 
 void VoxelMapping::allocate_aabb_device(const Eigen::VectorXi& aabb_indices) {
@@ -135,6 +135,35 @@ std::vector<float> VoxelMapping::get_grid_block(const Eigen::VectorXi& aabb_indi
     }
 
     return block;
+}
+
+void VoxelMapping::extract_slice(const Eigen::VectorXi& indices, std::vector<float>& slice) {
+    int min_x = indices[0];
+    int max_x = indices[1];
+    int min_y = indices[2];
+    int max_y = indices[3];
+    int min_z = indices[4];
+    int max_z = indices[5];
+
+    size_t slice_size_x = max_x - min_x + 1;
+    size_t slice_size_y = max_y - min_y + 1;
+    size_t slice_size_z = max_z - min_z + 1;
+
+    size_t slice_size = slice_size_x * slice_size_y;
+
+    slice.resize(slice_size);
+
+    float* d_slice;
+    cudaMalloc(&d_slice, slice_size * sizeof(float));
+
+    launch_extract_2d_slice_kernel(d_voxel_grid_, d_slice, min_x, max_x, min_y, max_y, min_z, max_z, stream_);
+
+    cudaError_t err = cudaMalloc(&d_slice, slice_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    cudaFree(d_slice);
 }
 
 void VoxelMapping::integrate_depth(const float* depth_image, const Eigen::Matrix4f& transform, const Eigen::VectorXi& aabb_indices) {

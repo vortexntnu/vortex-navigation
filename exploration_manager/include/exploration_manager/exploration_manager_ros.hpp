@@ -42,6 +42,7 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     geometry_msgs::msg::TransformStamped compute_map_odom_transform();
 
+    void timer_callback();
 
    private:
 
@@ -62,6 +63,8 @@ class ExplorationManagerNode : public rclcpp::Node {
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_pub_;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
+
+    rclcpp::TimerBase::SharedPtr timer_;
 
     std::string odom_frame_;
     std::string map_frame_;

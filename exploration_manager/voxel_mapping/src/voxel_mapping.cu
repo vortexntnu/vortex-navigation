@@ -14,6 +14,8 @@ __constant__ float d_log_odds_occupied;
 __constant__ float d_log_odds_free;
 __constant__ float d_log_odds_min;
 __constant__ float d_log_odds_max;
+__constant__ float d_occupancy_threshold;
+__constant__ float d_free_threshold;
 
 // aabb is z-major for locality in grid integration
 #define AABB_INDEX(x, y, z, size_x, size_y, size_z) ((x) * (size_y) * (size_z) + (y) * (size_z) + (z))
@@ -40,11 +42,13 @@ extern "C" void set_depth_range_d(float min_depth, float max_depth, cudaStream_t
     cudaMemcpyToSymbolAsync(d_max_depth, &max_depth, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
 }
 
-extern "C" void set_log_odds_properties_d(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, cudaStream_t stream) {
+extern "C" void set_log_odds_properties_d(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold, cudaStream_t stream) {
     cudaMemcpyToSymbolAsync(d_log_odds_occupied, &log_odds_occupied, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
     cudaMemcpyToSymbolAsync(d_log_odds_free, &log_odds_free, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
     cudaMemcpyToSymbolAsync(d_log_odds_min, &log_odds_min, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
     cudaMemcpyToSymbolAsync(d_log_odds_max, &log_odds_max, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyToSymbolAsync(d_occupancy_threshold, &occupancy_threshold, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
+    cudaMemcpyToSymbolAsync(d_free_threshold, &free_threshold, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
 }
 
 __global__ void aabb_raycasting_kernel(
@@ -153,6 +157,37 @@ __global__ void aabb_integration_kernel(
     }
 }
 
+__global__ void extract_2d_slice_kernel(
+    const float* d_voxel_grid, float* d_slice,
+    int min_x, int max_x, int min_y, int max_y, int min_z, int max_z) {
+    
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    if (x >= max_x - min_x + 1 || y >= max_y - min_y + 1) return;
+
+    int global_x = x + min_x;
+    int global_y = y + min_y;
+
+    if (global_x < 0 || global_x >= d_grid_size_x ||
+        global_y < 0 || global_y >= d_grid_size_y) return;
+
+    int slice_idx = y * (max_x - min_x + 1) + x;
+
+    for (int z = min_z; z <= max_z; ++z) {
+        int grid_idx = VOXEL_INDEX(global_x, global_y, z, d_grid_size_x, d_grid_size_y, d_grid_size_z);
+        float log_odds = d_voxel_grid[grid_idx];
+        
+        if (log_odds >= d_occupancy_threshold) {
+            d_slice[slice_idx] = 1.0f;
+            break;
+        }
+        else if (log_odds <= d_free_threshold) {
+            d_slice[slice_idx] = 0.0f;
+        }
+    }
+
+}
+
 extern "C" void launch_process_depth_kernels(
     const float* d_depth, int width, int height,
     const float* d_transform, float* d_voxel_grid, char* d_aabb,
@@ -173,5 +208,17 @@ extern "C" void launch_process_depth_kernels(
     dim3 integration_blocks((aabb_size_x + 15) / 16, (aabb_size_y + 15) / 16);
     aabb_integration_kernel<<<integration_blocks, threads, 0, stream>>>(
         d_aabb, d_voxel_grid,
+        min_x, max_x, min_y, max_y, min_z, max_z);
+}
+
+extern "C" void launch_extract_2d_slice_kernel(
+    const float* d_voxel_grid, float* d_slice,
+    int min_x, int max_x, int min_y, int max_y, int min_z, int max_z,
+    cudaStream_t stream) {
+
+    dim3 threads(16, 16);
+    dim3 blocks((max_x - min_x + 15) / 16, (max_y - min_y + 15) / 16);
+    extract_2d_slice_kernel<<<blocks, threads, 0, stream>>>(
+        d_voxel_grid, d_slice,
         min_x, max_x, min_y, max_y, min_z, max_z);
 }

@@ -10,6 +10,8 @@
     point_cloud_pub_topic: "/voxel_cloud"
     camera_view_visualization_pub_topic: "/camera_view"
 
+    timer_period_ms: 100
+
     voxel_mapping:
       grid_resolution: 0.1
       grid_size_x: 1000
@@ -21,5 +23,6 @@
       log_odds_free_update: -0.4
       log_odds_min: -6.0
       log_odds_max: 6.0
-      intensity_threshold: 3.0
+      occupancy_threshold: 3.0
+      free_threshold: -3.0
 

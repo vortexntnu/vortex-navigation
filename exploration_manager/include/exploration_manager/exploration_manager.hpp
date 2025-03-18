@@ -15,6 +15,8 @@ struct MapperParams {
     float log_odds_free;
     float log_odds_min;
     float log_odds_max;
+    float occupancy_threshold;
+    float free_threshold;
 };
 
 struct AABB {
@@ -194,6 +196,8 @@ class ExplorationManager {
      * @return const std::vector<float>& Updated block of the grid Z, Y, X major.
      */
     const std::vector<float>& get_updated_block() const { return updated_block_; }
+
+    void exploration_timer_callback();
 
     private:
     VoxelMapping mapper_;

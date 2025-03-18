@@ -8,7 +8,7 @@ ExplorationManager::~ExplorationManager() {
 }
 
 void ExplorationManager::initialize_mapper(MapperParams params) {
-    mapper_ = VoxelMapping(params.resolution, params.size_x, params.size_y, params.size_z, params.min_depth, params.max_depth, params.log_odds_occupied, params.log_odds_free, params.log_odds_min, params.log_odds_max);
+    mapper_ = VoxelMapping(params.resolution, params.size_x, params.size_y, params.size_z, params.min_depth, params.max_depth, params.log_odds_occupied, params.log_odds_free, params.log_odds_min, params.log_odds_max, params.occupancy_threshold, params.free_threshold);
     set_mapper_params(params);
 }
 
@@ -99,6 +99,19 @@ void ExplorationManager::process_depth_image(const float* depth_image) {
     mapper_.integrate_depth(depth_image, T, aabb_indices);
 
     updated_block_ = mapper_.get_grid_block(aabb_indices);
+}
+
+void ExplorationManager::exploration_timer_callback() {
+    const AABB& aabb = get_last_aabb();
+    const Eigen::VectorXi& aabb_indices = get_aabb_indices(aabb);
+    const Eigen::Matrix4f& T = get_cam_transform();
+
+    std::vector<float> slice;
+    mapper_.extract_slice(aabb_indices, slice);
+
+    // pass this vector to your class.
+    // can use Eigen::Map https://eigen.tuxfamily.org/dox/classEigen_1_1Map.html
+    // in order to wrap the vector in an eigen type
 
 }
 

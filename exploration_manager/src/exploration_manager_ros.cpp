@@ -7,7 +7,6 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
 
     initialize_mapper_params();
 
-    this->declare_parameter<float>("voxel_mapping.intensity_threshold");
     this->declare_parameter<bool>("enu_to_ned");
 
     odom_frame_ =
@@ -73,6 +72,12 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     auto marker_pub_topic = this->declare_parameter<std::string>("camera_view_visualization_pub_topic");
 
     marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(marker_pub_topic, qos);
+    
+    auto timer_period_ms = this->declare_parameter<int>("timer_period_ms");
+
+    timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(timer_period_ms),
+        std::bind(&ExplorationManagerNode::timer_callback, this));
 }
 
 void ExplorationManagerNode::initialize_mapper_params() {
@@ -87,7 +92,9 @@ void ExplorationManagerNode::initialize_mapper_params() {
     mapper_params.log_odds_free = this->declare_parameter<double>("voxel_mapping.log_odds_free_update");
     mapper_params.log_odds_min = this->declare_parameter<double>("voxel_mapping.log_odds_min");
     mapper_params.log_odds_max = this->declare_parameter<double>("voxel_mapping.log_odds_max");
-
+    mapper_params.occupancy_threshold = this->declare_parameter<double>("voxel_mapping.occupancy_threshold");
+    mapper_params.free_threshold = this->declare_parameter<double>("voxel_mapping.free_threshold");
+    
     exploration_manager_.initialize_mapper(mapper_params);
 }
 
@@ -201,7 +208,7 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
                 size_t idx = x * (aabb_size_y * aabb_size_z) + y * aabb_size_z + z;
                 if (idx < block.size()) {
                     float value = block[idx];
-                    if (value > this->get_parameter("voxel_mapping.intensity_threshold").as_double()) {
+                    if (value > this->get_parameter("voxel_mapping.occupancy_threshold").as_double()) {
                         *iter_x = static_cast<float>(aabb_min_x + x) * grid_resolution;
                         *iter_y = static_cast<float>(aabb_min_y + y) * grid_resolution;
                         *iter_z = static_cast<float>(aabb_min_z + z) * grid_resolution;
@@ -219,6 +226,10 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
 
     modifier.resize(point_count);
     point_cloud_pub_->publish(cloud_msg);
+}
+
+void ExplorationManagerNode::timer_callback() {
+    exploration_manager_.exploration_timer_callback();
 }
 
 void ExplorationManagerNode::publish_aabb_marker(const AABB& aabb) {
