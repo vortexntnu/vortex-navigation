@@ -109,6 +109,8 @@ void ExplorationManager::exploration_timer_callback() {
     std::vector<float> slice;
     mapper_.extract_slice(aabb_indices, slice);
 
+    // mapper_.extract_dialated_slice(aabb_indices, slice, dilation_size);
+
     // pass this vector to your class.
     // can use Eigen::Map https://eigen.tuxfamily.org/dox/classEigen_1_1Map.html
     // in order to wrap the vector in an eigen type

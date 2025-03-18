@@ -21,6 +21,12 @@ extern "C" void launch_extract_2d_slice_kernel(
     const float* d_voxel_grid, float* d_slice,
     int min_x, int max_x, int min_y, int max_y, int min_z, int max_z, cudaStream_t stream);
 
+
+extern "C" void launch_extract_dilated_2d_slice_kernel(
+    const float* d_voxel_grid, float* d_slice,
+    int min_x, int max_x, int min_y, int max_y, int min_z, int max_z, int dilation_size,
+    cudaStream_t stream); 
+
 class VoxelMapping {
 public:
     VoxelMapping(float resolution, uint size_x, uint size_y, uint size_z, float min_depth, float max_depth, float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold);
@@ -35,6 +41,8 @@ public:
     std::vector<float> get_grid_block(const Eigen::VectorXi& aabb_indices);
 
     void extract_slice(const Eigen::VectorXi& indices, std::vector<float>& slice);
+
+    void extract_dialated_slice(const Eigen::VectorXi& indices, std::vector<float>& slice, int dialation_size);
     
 private:
     void init_grid();

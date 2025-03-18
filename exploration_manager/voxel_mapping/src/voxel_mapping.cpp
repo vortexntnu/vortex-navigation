@@ -154,13 +154,64 @@ void VoxelMapping::extract_slice(const Eigen::VectorXi& indices, std::vector<flo
     slice.resize(slice_size);
 
     float* d_slice;
-    cudaMalloc(&d_slice, slice_size * sizeof(float));
-
-    launch_extract_2d_slice_kernel(d_voxel_grid_, d_slice, min_x, max_x, min_y, max_y, min_z, max_z, stream_);
 
     cudaError_t err = cudaMalloc(&d_slice, slice_size * sizeof(float));
     if (err != cudaSuccess) {
         std::cerr << "CUDA malloc failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    err = cudaMemset(d_slice, -1.0, slice_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memset failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    launch_extract_2d_slice_kernel(d_voxel_grid_, d_slice, min_x, max_x, min_y, max_y, min_z, max_z, stream_);
+
+    cudaStreamSynchronize(stream_);
+
+    err = cudaMemcpy(slice.data(), d_slice, slice_size * sizeof(float), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memcpy failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    cudaFree(d_slice);
+}
+
+void VoxelMapping::extract_dialated_slice(const Eigen::VectorXi& indices, std::vector<float>& slice, int dilation_size) {
+    int min_x = indices[0];
+    int max_x = indices[1];
+    int min_y = indices[2];
+    int max_y = indices[3];
+    int min_z = indices[4];
+    int max_z = indices[5];
+
+    size_t slice_size_x = max_x - min_x + 1;
+    size_t slice_size_y = max_y - min_y + 1;
+    size_t slice_size_z = max_z - min_z + 1;
+
+    size_t slice_size = slice_size_x * slice_size_y;
+
+    slice.resize(slice_size);
+
+    float* d_slice;
+
+    cudaError_t err = cudaMalloc(&d_slice, slice_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    err = cudaMemset(d_slice, -1.0, slice_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memset failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    launch_extract_dilated_2d_slice_kernel(d_voxel_grid_, d_slice, min_x, max_x, min_y, max_y, min_z, max_z, dilation_size, stream_);
+
+    cudaStreamSynchronize(stream_);
+
+    err = cudaMemcpy(slice.data(), d_slice, slice_size * sizeof(float), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memcpy failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
     }
 
     cudaFree(d_slice);
