@@ -3,6 +3,7 @@
 
 #include <voxel_mapping.hpp>
 #include <Eigen/Dense>
+#include <functional>
 
 struct MapperParams {
     float resolution;
@@ -198,6 +199,8 @@ class ExplorationManager {
     const std::vector<float>& get_updated_block() const { return updated_block_; }
 
     void exploration_timer_callback();
+
+    std::function<void(const std::vector<float>&, const Eigen::VectorXi&)> ros_callback_;
 
     private:
     VoxelMapping mapper_;

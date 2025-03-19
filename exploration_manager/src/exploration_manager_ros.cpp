@@ -78,6 +78,12 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(timer_period_ms),
         std::bind(&ExplorationManagerNode::timer_callback, this));
+
+    pointcloud_slice_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "point_cloud_slice", qos);
+
+    exploration_manager_.ros_callback_ = std::bind(&ExplorationManagerNode::publish_slice, this, std::placeholders::_1, std::placeholders::_2);
+
 }
 
 void ExplorationManagerNode::initialize_mapper_params() {
@@ -323,8 +329,8 @@ void ExplorationManagerNode::camera_info_callback(const sensor_msgs::msg::Camera
     ImageProperties image_properties;
     image_properties.width = msg->width;
     image_properties.height = msg->height;
-    image_properties.min_depth = this->get_parameter("min_depth").as_double();
-    image_properties.max_depth = this->get_parameter("max_depth").as_double();
+    image_properties.min_depth = this->get_parameter("voxel_mapping.min_depth").as_double();
+    image_properties.max_depth = this->get_parameter("voxel_mapping.max_depth").as_double();
     float fx = msg->k[0];
     float fy = msg->k[4];
     float cx = msg->k[2];
@@ -342,6 +348,51 @@ void ExplorationManagerNode::camera_info_callback(const sensor_msgs::msg::Camera
 
 void ExplorationManagerNode::dvl_altitude_callback(const vortex_msgs::msg::DVLAltitude::SharedPtr msg) {
     exploration_manager_.set_dvl_altitude(msg->altitude);
+}
+
+void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, const Eigen::VectorXi& aabb_indices) {
+    sensor_msgs::msg::PointCloud2 cloud_msg;
+    cloud_msg.header.stamp = this->get_clock()->now();
+    cloud_msg.header.frame_id = map_frame_;
+    cloud_msg.is_dense = false;
+
+    int width = aabb_indices[1] - aabb_indices[0] + 1;
+    int height = aabb_indices[3] - aabb_indices[2] + 1;
+
+    sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
+    modifier.setPointCloud2Fields(
+        3,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
+
+    modifier.resize(width * height);
+    sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
+
+    double voxel_resolution_ = this->get_parameter("voxel_mapping.grid_resolution").as_double();
+
+    for (int x = 0; x < width; ++x) {
+        for (int y = 0; y < height; ++y) {
+            int idx = x * height + y;
+            if (idx < slice.size()) {
+                *iter_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
+                *iter_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
+                if(slice[idx] > this->get_parameter("voxel_mapping.occupancy_threshold").as_double()) {
+                    *iter_intensity = 100.0;
+                } else {
+                    *iter_intensity = 0.0;
+                }
+                ++iter_x;
+                ++iter_y;
+                ++iter_intensity;
+            }
+        }
+    }
+
+    pointcloud_slice_pub_->publish(cloud_msg);
 }
 
 RCLCPP_COMPONENTS_REGISTER_NODE(ExplorationManagerNode)

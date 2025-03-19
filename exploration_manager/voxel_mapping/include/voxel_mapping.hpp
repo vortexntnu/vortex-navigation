@@ -5,11 +5,11 @@
 #include <cuda_runtime.h>
 #include <Eigen/Dense>
 
-extern "C" void set_intrinsics_d(const float* intrinsics, cudaStream_t stream);
-extern "C" void set_image_size_d(int width, int height, cudaStream_t stream);
-extern "C" void set_grid_constants_d(float resolution, uint grid_size_x, uint grid_size_y, uint grid_size_z, cudaStream_t stream);
-extern "C" void set_depth_range_d(float min_depth, float max_depth, cudaStream_t stream);
-extern "C" void set_log_odds_properties_d(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold, cudaStream_t stream);
+extern "C" void set_intrinsics_d(const float* intrinsics);
+extern "C" void set_image_size_d(int width, int height);
+extern "C" void set_grid_constants_d(float resolution, uint grid_size_x, uint grid_size_y, uint grid_size_z);
+extern "C" void set_depth_range_d(float min_depth, float max_depth);
+extern "C" void set_log_odds_properties_d(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold);
 
 extern "C" void launch_process_depth_kernels(
     const float* d_depth, int width, int height,

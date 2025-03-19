@@ -21,16 +21,20 @@ void VoxelMapping::init_grid() {
 
     cudaError_t err1 = cudaMalloc((void**)&d_voxel_grid_, matrix_size);
 
-    cudaMemset(d_voxel_grid_, 0, matrix_size);
-
+    cudaError_t err2 = cudaMemset(d_voxel_grid_, 0, matrix_size);
     if (err1 != cudaSuccess) {
         std::cerr << "CUDA malloc failed for voxel grid: " << cudaGetErrorString(err1) << std::endl;
         exit(EXIT_FAILURE);
     }
+    if (err2 != cudaSuccess) {
+        std::cerr << "CUDA memset failed for voxel grid: " << cudaGetErrorString(err2) << std::endl;
+        cudaFree(d_voxel_grid_);
+        exit(EXIT_FAILURE);
+    }
 
-    set_grid_constants_d(resolution_, size_x_, size_y_, size_z_, stream_);
-    set_depth_range_d(min_depth_, max_depth_, stream_);
-    set_log_odds_properties_d(log_odds_occupied_, log_odds_free_, log_odds_min_, log_odds_max_, occupancy_threshold_, free_threshold_, stream_);
+    set_grid_constants_d(resolution_, size_x_, size_y_, size_z_);
+    set_depth_range_d(min_depth_, max_depth_);
+    set_log_odds_properties_d(log_odds_occupied_, log_odds_free_, log_odds_min_, log_odds_max_, occupancy_threshold_, free_threshold_);
 
     std::cout << "Voxel grid initialized on GPU with size " << size_x_ << "x" << size_y_ << "x" << size_z_ << std::endl;
 }
@@ -42,17 +46,17 @@ void VoxelMapping::set_K(float fx, float fy, float cx, float cy) {
     cy_ = cy;
     float intrinsics[4] = {static_cast<float>(fx), static_cast<float>(fy), 
                           static_cast<float>(cx), static_cast<float>(cy)};
-    set_intrinsics_d(intrinsics, stream_);
+    set_intrinsics_d(intrinsics);
 }
 
 void VoxelMapping::set_image_size(int width, int height) {
     image_width_ = width;
     image_height_ = height;
-    set_image_size_d(width, height, stream_);
+    set_image_size_d(width, height);
 }
 
 void VoxelMapping::set_log_odds_properties(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold) {
-    set_log_odds_properties_d(log_odds_occupied, log_odds_free, log_odds_min, log_odds_max, occupancy_threshold, free_threshold, stream_);
+    set_log_odds_properties_d(log_odds_occupied, log_odds_free, log_odds_min, log_odds_max, occupancy_threshold, free_threshold);
 }
 
 void VoxelMapping::allocate_aabb_device(const Eigen::VectorXi& aabb_indices) {
@@ -225,14 +229,14 @@ void VoxelMapping::integrate_depth(const float* depth_image, const Eigen::Matrix
     std::vector<float> host_buffer(16 + image_width_ * image_height_);
     memcpy(host_buffer.data(), transform.data(), transform_size);
     memcpy(host_buffer.data() + 16, depth_image, depth_size);
-    if (!d_buffer_) {
-        cudaError_t err = cudaMalloc(&d_buffer_, total_size);
-        if (err != cudaSuccess) {
-            std::cerr << "CUDA malloc failed for buffer: " << cudaGetErrorString(err) << std::endl;
-            exit(EXIT_FAILURE);
-        }
+
+    cudaError_t err = cudaMalloc(&d_buffer_, total_size);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for buffer: " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
     }
-    cudaError_t err = cudaMemcpyAsync(d_buffer_, host_buffer.data(), total_size, cudaMemcpyHostToDevice, stream_);
+
+    err = cudaMemcpyAsync(d_buffer_, host_buffer.data(), total_size, cudaMemcpyHostToDevice, stream_);
     if (err != cudaSuccess) {
         std::cerr << "CUDA memcpy failed for buffer: " << cudaGetErrorString(err) << std::endl;
         exit(EXIT_FAILURE);
@@ -263,12 +267,12 @@ void VoxelMapping::integrate_depth(const float* depth_image, const Eigen::Matrix
 }
 
 VoxelMapping::~VoxelMapping() {
-    cudaStreamDestroy(stream_);
-    cudaFree(d_voxel_grid_);
-    if (d_buffer_) {
-        cudaFree(d_buffer_);
-    }
-    if (d_aabb_) {
-        cudaFree(d_aabb_);
-    }
+    // cudaStreamDestroy(stream_); Gets destroyed when non-default constructor is called.
+    // cudaFree(d_voxel_grid_);
+    // if (d_buffer_) {
+    //     cudaFree(d_buffer_);
+    // }
+    // if (d_aabb_) {
+    //     cudaFree(d_aabb_);
+    // }
 }

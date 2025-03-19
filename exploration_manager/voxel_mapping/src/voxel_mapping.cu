@@ -1,5 +1,6 @@
 #include <cuda_runtime.h>
 #include <cuda/atomic>
+#include <iostream>
 
 __constant__ float d_intrinsics[4];
 __constant__ uint d_image_width;
@@ -22,34 +23,34 @@ __constant__ float d_free_threshold;
 #define VOXEL_INDEX(x, y, z, size_x, size_y, size_z) ((x) * (size_y) * (size_z) + (y) * (size_z) + (z))
 #define SLICE_INDEX(x, y, size_x) ((x) * (size_x) + (y))
 
-extern "C" void set_intrinsics_d(const float* intrinsics, cudaStream_t stream) {
-    cudaMemcpyToSymbolAsync(d_intrinsics, intrinsics, 4 * sizeof(float), 0, cudaMemcpyHostToDevice, stream);
+extern "C" void set_intrinsics_d(const float* intrinsics) {
+    cudaMemcpyToSymbol(d_intrinsics, intrinsics, 4 * sizeof(float), 0, cudaMemcpyHostToDevice);
 }
 
-extern "C" void set_image_size_d(uint width, uint height, cudaStream_t stream) {
-    cudaMemcpyToSymbolAsync(d_image_width, &width, sizeof(uint), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_image_height, &height, sizeof(uint), 0, cudaMemcpyHostToDevice, stream);
+extern "C" void set_image_size_d(uint width, uint height) {
+    cudaMemcpyToSymbol(d_image_width, &width, sizeof(uint), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_image_height, &height, sizeof(uint), 0, cudaMemcpyHostToDevice);
 }
 
-extern "C" void set_grid_constants_d(uint grid_size_x, uint grid_size_y, uint grid_size_z, float resolution, cudaStream_t stream) {
-    cudaMemcpyToSymbolAsync(d_grid_size_x, &grid_size_x, sizeof(uint), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_grid_size_y, &grid_size_y, sizeof(uint), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_grid_size_z, &grid_size_z, sizeof(uint), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_resolution, &resolution, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
+extern "C" void set_grid_constants_d(uint grid_size_x, uint grid_size_y, uint grid_size_z, float resolution) {
+    cudaMemcpyToSymbol(d_grid_size_x, &grid_size_x, sizeof(uint), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_grid_size_y, &grid_size_y, sizeof(uint), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_grid_size_z, &grid_size_z, sizeof(uint), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_resolution, &resolution, sizeof(float), 0, cudaMemcpyHostToDevice);
 }
 
-extern "C" void set_depth_range_d(float min_depth, float max_depth, cudaStream_t stream) {
-    cudaMemcpyToSymbolAsync(d_min_depth, &min_depth, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_max_depth, &max_depth, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
+extern "C" void set_depth_range_d(float min_depth, float max_depth) {
+    cudaMemcpyToSymbol(d_min_depth, &min_depth, sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_max_depth, &max_depth, sizeof(float), 0, cudaMemcpyHostToDevice);
 }
 
-extern "C" void set_log_odds_properties_d(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold, cudaStream_t stream) {
-    cudaMemcpyToSymbolAsync(d_log_odds_occupied, &log_odds_occupied, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_log_odds_free, &log_odds_free, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_log_odds_min, &log_odds_min, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_log_odds_max, &log_odds_max, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_occupancy_threshold, &occupancy_threshold, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyToSymbolAsync(d_free_threshold, &free_threshold, sizeof(float), 0, cudaMemcpyHostToDevice, stream);
+extern "C" void set_log_odds_properties_d(float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold) {
+    cudaMemcpyToSymbol(d_log_odds_occupied, &log_odds_occupied, sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_log_odds_free, &log_odds_free, sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_log_odds_min, &log_odds_min, sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_log_odds_max, &log_odds_max, sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_occupancy_threshold, &occupancy_threshold, sizeof(float), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(d_free_threshold, &free_threshold, sizeof(float), 0, cudaMemcpyHostToDevice);
 }
 
 __global__ void aabb_raycasting_kernel(
@@ -108,7 +109,7 @@ __global__ void aabb_raycasting_kernel(
 
         if (free_grid_x < 0 || free_grid_x >= aabb_size_x ||
             free_grid_y < 0 || free_grid_y >= aabb_size_y ||
-            free_grid_z < min_z || free_grid_z > max_z) continue;
+            free_grid_z < 0 || free_grid_z > aabb_size_z) continue;
 
         int aabb_idx = AABB_INDEX(free_grid_x, free_grid_y, free_grid_z, aabb_size_x, aabb_size_y, aabb_size_z);
         d_aabb_3d[aabb_idx] = 1;
@@ -202,7 +203,11 @@ extern "C" void launch_process_depth_kernels(
         d_depth, d_transform, d_aabb,
         min_x, max_x, min_y, max_y, min_z, max_z);
 
-    cudaStreamSynchronize(stream);
+    cudaError_t err = cudaStreamSynchronize(stream);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Error after aabb_raycasting_kernel: " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
 
     int aabb_size_x = max_x - min_x + 1;
     int aabb_size_y = max_y - min_y + 1;
@@ -284,14 +289,14 @@ __global__ void extract_dilated_slice_kernel(
 
     if(shared_voxel[SHARED_INDEX(block_x, block_y)] == 1.0f) {
         int count = 0;
-        count += shared_voxel[SHARED_INDEX(block_x - 1, block_y - 1)] > 1.0f;
-        count += shared_voxel[SHARED_INDEX(block_x, block_y - 1)] > 1.0f;
-        count += shared_voxel[SHARED_INDEX(block_x + 1, block_y - 1)] > 1.0f;
-        count += shared_voxel[SHARED_INDEX(block_x - 1, block_y)] > 1.0f;
-        count += shared_voxel[SHARED_INDEX(block_x + 1, block_y)] > 1.0f;
-        count += shared_voxel[SHARED_INDEX(block_x - 1, block_y + 1)] > 1.0f;
-        count += shared_voxel[SHARED_INDEX(block_x, block_y + 1)] > 1.0f;
-        count += shared_voxel[SHARED_INDEX(block_x + 1, block_y + 1)] > 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x - 1, block_y - 1)] == 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x, block_y - 1)] == 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x + 1, block_y - 1)] == 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x - 1, block_y)] == 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x + 1, block_y)] == 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x - 1, block_y + 1)] == 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x, block_y + 1)] == 1.0f;
+        count += shared_voxel[SHARED_INDEX(block_x + 1, block_y + 1)] == 1.0f;
         if (count < 2) {
             shared_voxel[SHARED_INDEX(block_x, block_y)] = 0.0f;
         }
