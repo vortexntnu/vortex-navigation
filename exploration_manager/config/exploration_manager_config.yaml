@@ -2,10 +2,10 @@
   ros__parameters:
     odom_frame: "odom"
     map_frame: "map"
-    enu_to_ned: false
-    optical_frame: "zed_left_camera_optical_frame"
-    depth_image_sub_topic: "/zed/zed_node/depth/depth_registered"
-    camera_info_sub_topic: "/zed/zed_node/depth/camera_info"
+    enu_to_ned: true
+    optical_frame: "Orca/Dcam"
+    depth_image_sub_topic: "/depth_cam/image_depth"
+    camera_info_sub_topic: "/depth_cam/camera_info"
     dvl_altitude_sub_topic: "/dvl/altitude"
     point_cloud_pub_topic: "/voxel_cloud"
     camera_view_visualization_pub_topic: "/camera_view"
