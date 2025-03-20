@@ -361,18 +361,23 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
 
     sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
     modifier.setPointCloud2Fields(
-        3,
+        4,
         "x", 1, sensor_msgs::msg::PointField::FLOAT32,
         "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
         "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
     );
 
     modifier.resize(width * height);
     sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
     sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
     sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
 
     double voxel_resolution_ = this->get_parameter("voxel_mapping.grid_resolution").as_double();
+    int min_z = aabb_indices[4];  // Assuming min_z is stored in aabb_indices[4]
+    int max_z = aabb_indices[5];  // Assuming max_z is stored in aabb_indices[5]
+    float z_value = static_cast<float>(min_z + max_z)/2 * voxel_resolution_;
 
     for (int x = 0; x < width; ++x) {
         for (int y = 0; y < height; ++y) {
@@ -380,13 +385,17 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
             if (idx < slice.size()) {
                 *iter_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
                 *iter_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
-                if(slice[idx] > this->get_parameter("voxel_mapping.occupancy_threshold").as_double()) {
+                *iter_z = z_value;
+                if(slice[idx] == 1.0) {
                     *iter_intensity = 100.0;
-                } else {
+                } else if(slice[idx] == 0.0) {
                     *iter_intensity = 0.0;
+                } else {
+                    *iter_intensity = -100.0;
                 }
                 ++iter_x;
                 ++iter_y;
+                ++iter_z;
                 ++iter_intensity;
             }
         }

@@ -19,8 +19,8 @@
       grid_size_z: 100
       min_depth: 0.3
       max_depth: 5.0
-      log_odds_occupied_update: 0.5
-      log_odds_free_update: -0.4
+      log_odds_occupied_update: 1.0
+      log_odds_free_update: -1.0
       log_odds_min: -6.0
       log_odds_max: 6.0
       occupancy_threshold: 3.0

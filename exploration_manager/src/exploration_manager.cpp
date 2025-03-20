@@ -105,13 +105,17 @@ void ExplorationManager::exploration_timer_callback() {
     const AABB& aabb = get_last_aabb();
     const Eigen::VectorXi& aabb_indices = get_aabb_indices(aabb);
     const Eigen::Matrix4f& T = get_cam_transform();
-
+    Eigen::VectorXi slice_indices = aabb_indices;
+    float current_z = T(2, 3);
+    slice_indices[4] = std::max(0, static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
+    slice_indices[5] = std::min(static_cast<int>(get_mapper_params().size_z - 1), static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
+    
     std::vector<float> slice;
-    mapper_.extract_slice(aabb_indices, slice);
-    // mapper_.extract_dialated_slice(aabb_indices, slice, 5);
+    // mapper_.extract_slice(slice_indices, slice);
+    mapper_.extract_dialated_slice(slice_indices, slice, 3);
 
     if (ros_callback_) {
-        ros_callback_(slice, aabb_indices);
+        ros_callback_(slice, slice_indices);
     }
 
 
