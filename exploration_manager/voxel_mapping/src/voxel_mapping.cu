@@ -238,6 +238,128 @@ extern "C" void launch_extract_2d_slice_kernel(
         min_x, max_x, min_y, max_y, min_z, max_z);
 }
 
+__global__ void extract_slice_kernel(
+    const float* d_voxel_grid, float* d_slice,
+    int min_x, int max_x, int min_y, int max_y, int min_z, int max_z) {
+    
+    int slice_x = blockIdx.x * blockDim.x + threadIdx.x;
+    int slice_y = blockIdx.y * blockDim.y + threadIdx.y;
+    int slice_size_x = max_x - min_x + 1;
+    int slice_size_y = max_y - min_y + 1;
+
+    if (slice_x >= slice_size_x || slice_y >= slice_size_y) return;
+    
+    int global_x = slice_x + min_x;
+    int global_y = slice_y + min_y;
+    
+    if (global_x < 0 || global_x >= d_grid_size_x ||
+        global_y < 0 || global_y >= d_grid_size_y) return;
+
+    float state = -1.0f;  // Default: unknown
+    for (int z = min_z; z <= max_z; ++z) {
+        int grid_idx = VOXEL_INDEX(global_x, global_y, z, d_grid_size_x, d_grid_size_y, d_grid_size_z);
+        float log_odds = d_voxel_grid[grid_idx];
+
+        if (log_odds >= d_occupancy_threshold) {
+            state = 1.0f;  // Occupied
+            break;
+        } else if (log_odds <= d_free_threshold) {
+            state = 0.0f;  // Free
+        }
+    }
+
+    d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_x)] = state;
+}
+
+__global__ void dilate_x_kernel(
+    float* src, float* dst, int radio, int width, int height, int tile_w, int tile_h) {
+    extern __shared__ float smem[];
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+    int x = bx * tile_w + tx - radio;
+    int y = by * tile_h + ty;
+    smem[ty * blockDim.x + tx] = -1.0f;
+    __syncthreads();
+    if (x < 0 || x >= width || y >= height) return;
+    smem[ty * blockDim.x + tx] = src[y * width + x];
+    __syncthreads();
+    if (x < (bx * tile_w) || x >= ((bx + 1) * tile_w)) return;
+    float* smem_thread = &smem[ty * blockDim.x + tx - radio];
+    float val = smem_thread[0];
+    for (int xx = 1; xx <= 2 * radio; xx++) {
+        val = max(val, smem_thread[xx]);
+    }
+    dst[y * width + x] = val;
+}
+
+__global__ void dilate_y_kernel(
+    float* src, float* dst, int radio, int width, int height, int tile_w, int tile_h) {
+    extern __shared__ float smem[];
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+    int x = bx * tile_w + tx;
+    int y = by * tile_h + ty - radio;
+    smem[ty * blockDim.x + tx] = -1.0f;
+    __syncthreads();
+    if (x >= width || y < 0 || y >= height) return;
+    smem[ty * blockDim.x + tx] = src[y * width + x];
+    __syncthreads();
+    if (y < (by * tile_h) || y >= ((by + 1) * tile_h)) return;
+    float* smem_thread = &smem[(ty - radio) * blockDim.x + tx];
+    float val = smem_thread[0];
+    for (int yy = 1; yy <= 2 * radio; yy++) {
+        val = max(val, smem_thread[yy * blockDim.x]);
+    }
+    dst[y * width + x] = val;
+}
+
+
+
+void launch_dilate_slice_2d(
+    float* src, float* dst, float* temp, int width, int height, int dilation_size) {
+    // X-Kernel: Ensure blockDim.x is a multiple of 32
+    int base_tile_w_x = 512;  // Starting point, power of 2
+    int halo_size = 2 * dilation_size;
+    int remainder = halo_size % 32;
+    int tile_w_x = base_tile_w_x - remainder;  // Adjust to make blockDim.x a multiple of 32
+    if (tile_w_x + halo_size > 1024) {
+        tile_w_x = 1024 - halo_size;  // Cap at max threads per block
+    }
+    int tile_h_x = 1;
+    dim3 block_x(tile_w_x + halo_size, tile_h_x);  // blockDim.x = tile_w + 2 * dilation_size
+    dim3 grid_x(ceil((float)width / tile_w_x), ceil((float)height / tile_h_x));
+    
+    // Verify blockDim.x is a multiple of 32
+    assert((tile_w_x + halo_size) % 32 == 0);
+    assert((tile_w_x + halo_size) <= 1024);
+
+    dilate_x_kernel<<<grid_x, block_x, block_x.y * block_x.x * sizeof(float)>>>(
+        src, temp, dilation_size, width, height, tile_w_x, tile_h_x);
+    cudaDeviceSynchronize();
+
+    // Y-Kernel: Ensure blockDim.y is a multiple of 32, blockDim.x is small and multiple of 2
+    int tile_w_y = 16;  // Fixed, multiple of 2, balances total threads
+    int base_tile_h_y = 64;  // Starting point, multiple of 32
+    int tile_h_y = base_tile_h_y - remainder;  // Adjust for blockDim.y
+    if (tile_w_y * (tile_h_y + halo_size) > 1024) {
+        tile_h_y = (1024 / tile_w_y) - halo_size;  // Cap total threads
+    }
+    dim3 block_y(tile_w_y, tile_h_y + halo_size);
+    dim3 grid_y(ceil((float)width / tile_w_y), ceil((float)height / tile_h_y));
+    
+    // Verify blockDim.y is a multiple of 32 and total threads <= 1024
+    assert((tile_h_y + halo_size) % 32 == 0);
+    assert(tile_w_y * (tile_h_y + halo_size) <= 1024);
+
+    dilate_y_kernel<<<grid_y, block_y, block_y.y * block_y.x * sizeof(float)>>>(
+        temp, dst, dilation_size, width, height, tile_w_y, tile_h_y);
+    cudaDeviceSynchronize();
+}
+
 __global__ void extract_dilated_slice_kernel(
     const float* d_voxel_grid, float* d_slice,
     int min_x, int max_x, int min_y, int max_y, int min_z, int max_z, int dilation_size) {
