@@ -6,15 +6,13 @@
 #include <Eigen/Dense> // Include the Eigen library
 
 struct Params{
-    double sigmaX;
+    double sigmaX; //paramters for the 2D gaussian
     double sigmaY;
     int centerX;
     int centerY;
     double localBias; //how much will the drone prefer to explore close to current location
-    int obstaclesMargin;
-    double depthMargin;
-    double ignoreDepthMargin;
-    double searchRadius; //radius of what is considered seen around the drone
+    int obstaclesMargin; //how many cells around an obstacle are considered untouchable
+    double searchRadius; //radius of what is considered seen around the drone (meters)
     double gridSize = 0.1; //size of each grid cell in meters
 };
 
@@ -23,11 +21,8 @@ struct Point{
     int y;
 };
 
-struct Point3{
-    double x, y, z;
-};
 
-double distance(const Point &p1, const Point &p2);
+double distance(const Eigen::Vector2d &p1, const Eigen::Vector2d &p2);
 
 class WaypointFinder {
     Params params;
@@ -40,11 +35,12 @@ class WaypointFinder {
 
     public:
         WaypointFinder(){};
-        WaypointFinder(const Point gridSize, const Params &newParams);
+        WaypointFinder(const Eigen::Vector2i gridSize, const Params &newParams);
 
-        //subgrid contains absolute depth values
-        void updateGrid(Eigen::MatrixXd &subGrid, const Point dronePosition, const Eigen::VectorXi &aabb);
+        //subgrid contains data around the drone, 0 is free, 1 is obstacle, -1 is unknown
+        //dronePosition is the current drone position in meters
+        void updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d dronePosition, const Eigen::VectorXi &aabb);
 
-        Point getWaypoint();
+        Point getWaypoint(const Eigen::Vector2d dronePosition);
 
 };

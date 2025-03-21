@@ -1,8 +1,8 @@
 #include "waypointFinder.hpp"
 
 
-double distance(const Point &p1, const Point &p2){
-    return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
+double distance(const Eigen::Vector2d &p1, const Eigen::Vector2d &p2){
+    return sqrt(pow(p1(0) - p2(0), 2) + pow(p1(1) - p2(1), 2));
 }
 
 double WaypointFinder::tileUtility(const double value, const double distance){
@@ -19,15 +19,15 @@ void WaypointFinder::initGaussian(){
     }
 }
 
-WaypointFinder::WaypointFinder(const Point gridSize, const Params &newParams){
+WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const Params &newParams){
     params = newParams;
-    values = Eigen::MatrixXd::Zero(gridSize.x, gridSize.y);
-    obstacles = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(gridSize.x, gridSize.y);
+    values = Eigen::MatrixXd::Zero(gridSize(0), gridSize(1));
+    obstacles = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(gridSize(0), gridSize(1));
     
     initGaussian();
 }
 
-void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Point dronePosition, const Eigen::VectorXi &aabb){
+void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d dronePosition, const Eigen::VectorXi &aabb){
     //sets seen points and obstacles
     Point offset = {aabb(0), aabb(2)};
 
@@ -43,8 +43,8 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Point dronePosit
     }
 
     //flag seen points
-    for (int x = dronePosition.x - params.searchRadius/2; x < dronePosition.x + params.searchRadius/2; x++){
-        for (int y = dronePosition.y - params.searchRadius/2; y < dronePosition.y + params.searchRadius/2; y++){
+    for (int x = dronePosition(0) - params.searchRadius/2; x < dronePosition(0) + params.searchRadius/2; x++){
+        for (int y = dronePosition(1) - params.searchRadius/2; y < dronePosition(1) + params.searchRadius/2; y++){
             
             //transform based on grid scale difference
             int coordX = x/params.gridSize;
@@ -54,7 +54,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Point dronePosit
                 continue;
             }
 
-            if (distance({x, y}, {dronePosition.x, dronePosition.y}) < params.searchRadius){
+            if (distance(Eigen::Vector2d{x, y}, dronePosition) < params.searchRadius){
                 values(coordX, coordY) = 0;
             }
         }
@@ -90,7 +90,7 @@ Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> dilateMask(const Eigen::Matr
     return outputMask;
 }
 
-Point WaypointFinder::getWaypoint(){
+Point WaypointFinder::getWaypoint(const Eigen::Vector2d dronePosition){
     Point maxPoint = {params.centerX, params.centerY};
     double maxUtility = 0;
 
@@ -102,7 +102,7 @@ Point WaypointFinder::getWaypoint(){
             if (obstaclesWithBuffer(x, y)){
                 continue;
             }
-            double utility = tileUtility(values(x, y), distance({x, y}, {params.centerX, params.centerY}));
+            double utility = tileUtility(values(x, y), distance(Eigen::Vector2d{x, y}, dronePosition));
             if (utility > maxUtility){
                 maxUtility = utility;
                 maxPoint = {x, y};
