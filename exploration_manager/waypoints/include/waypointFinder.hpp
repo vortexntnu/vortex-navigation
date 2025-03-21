@@ -38,7 +38,7 @@ class WaypointFinder {
         WaypointFinder(const Eigen::Vector2i gridSize, const Params &newParams);
 
         //subgrid contains data around the drone, 0 is free, 1 is obstacle, -1 is unknown
-        //dronePosition is the current drone position in meters
+        //dronePosition is the current drone xy position in meters
         void updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d dronePosition, const Eigen::VectorXi &aabb);
 
         Point getWaypoint(const Eigen::Vector2d dronePosition);
