@@ -19,9 +19,9 @@ __constant__ float d_occupancy_threshold;
 __constant__ float d_free_threshold;
 
 // aabb is z-major for locality in grid integration
-#define AABB_INDEX(x, y, z, size_x, size_y, size_z) ((x) * (size_y) * (size_z) + (y) * (size_z) + (z))
-#define VOXEL_INDEX(x, y, z, size_x, size_y, size_z) ((x) * (size_y) * (size_z) + (y) * (size_z) + (z))
-#define SLICE_INDEX(x, y, size_y) ((x) * (size_y) + (y))
+#define AABB_INDEX(x, y, z, size_x, size_y, size_z) ((y) * (size_x) * (size_z) + (x) * (size_z) + (z))
+#define VOXEL_INDEX(x, y, z, size_x, size_y, size_z) ((y) * (size_x) * (size_z) + (x) * (size_z) + (z))
+#define SLICE_INDEX(x, y, size_x) ((y) * (size_x) + (x))
 
 extern "C" void set_intrinsics_d(const float* intrinsics) {
     cudaMemcpyToSymbol(d_intrinsics, intrinsics, 4 * sizeof(float), 0, cudaMemcpyHostToDevice);
@@ -182,18 +182,17 @@ __global__ void extract_2d_slice_kernel(
         global_y < 0 || global_y >= d_grid_size_y) return;
 
     int slice_size_x = max_x - min_x + 1;
-    int slice_size_y = max_y - min_y + 1;
 
     for (int z = min_z; z <= max_z; ++z) {
         int grid_idx = VOXEL_INDEX(global_x, global_y, z, d_grid_size_x, d_grid_size_y, d_grid_size_z);
         float log_odds = d_voxel_grid[grid_idx];
         
         if (log_odds >= d_occupancy_threshold) {
-            d_slice[SLICE_INDEX(x, y, slice_size_y)] = 1.0f;
+            d_slice[SLICE_INDEX(x, y, slice_size_x)] = 1.0f;
             break;
         }
         else if (log_odds <= d_free_threshold) {
-            d_slice[SLICE_INDEX(x, y, slice_size_y)] = 0.0f;
+            d_slice[SLICE_INDEX(x, y, slice_size_x)] = 0.0f;
         }
     }
 
@@ -384,11 +383,11 @@ __global__ void extract_dilated_slice_kernel(
         float log_odds = d_voxel_grid[grid_idx];
         
         if (log_odds >= d_occupancy_threshold) {
-            d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_y)] = 1.0f;
+            d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_x)] = 1.0f;
             break;
         }
         else if (log_odds <= d_free_threshold) {
-            d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_y)] = 0.0f;
+            d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_x)] = 0.0f;
         }
     }
         
@@ -402,19 +401,19 @@ __global__ void extract_dilated_slice_kernel(
     int block_y = threadIdx.y;
 
     if (block_x < dilation_size && slice_x - dilation_size >= 0) {
-        shared_voxel[SHARED_INDEX(block_x - dilation_size, block_y)] = d_slice[SLICE_INDEX(slice_x - dilation_size, slice_y, slice_size_y)];
+        shared_voxel[SHARED_INDEX(block_x - dilation_size, block_y)] = d_slice[SLICE_INDEX(slice_x - dilation_size, slice_y, slice_size_x)];
     }
     if (block_x >= blockDim.x - dilation_size && slice_x + dilation_size < d_grid_size_x) {
-        shared_voxel[SHARED_INDEX(block_x + dilation_size, block_y)] = d_slice[SLICE_INDEX(slice_x + dilation_size, slice_y, slice_size_y)];
+        shared_voxel[SHARED_INDEX(block_x + dilation_size, block_y)] = d_slice[SLICE_INDEX(slice_x + dilation_size, slice_y, slice_size_x)];
     }
     if (block_y < dilation_size && slice_y - dilation_size >= 0) {
-        shared_voxel[SHARED_INDEX(block_x, block_y - dilation_size)] = d_slice[SLICE_INDEX(slice_x, slice_y - dilation_size, slice_size_y)];
+        shared_voxel[SHARED_INDEX(block_x, block_y - dilation_size)] = d_slice[SLICE_INDEX(slice_x, slice_y - dilation_size, slice_size_x)];
     }
     if (block_y >= blockDim.y - dilation_size && slice_y + dilation_size < d_grid_size_y) {
-        shared_voxel[SHARED_INDEX(block_x, block_y + dilation_size)] = d_slice[SLICE_INDEX(slice_x, slice_y + dilation_size, slice_size_y)];
+        shared_voxel[SHARED_INDEX(block_x, block_y + dilation_size)] = d_slice[SLICE_INDEX(slice_x, slice_y + dilation_size, slice_size_x)];
     }
 
-    shared_voxel[SHARED_INDEX(block_x, block_y)] = d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_y)];
+    shared_voxel[SHARED_INDEX(block_x, block_y)] = d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_x)];
 
     __syncthreads();
 
@@ -442,7 +441,7 @@ __global__ void extract_dilated_slice_kernel(
 
     __syncthreads();
 
-    d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_y)] = shared_voxel[SHARED_INDEX(block_x, block_y)];
+    d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_x)] = shared_voxel[SHARED_INDEX(block_x, block_y)];
 }
 
 extern "C" void launch_extract_dilated_2d_slice_kernel(

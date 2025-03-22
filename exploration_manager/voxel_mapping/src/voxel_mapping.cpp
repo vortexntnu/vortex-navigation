@@ -87,7 +87,7 @@ void VoxelMapping::allocate_aabb_device(const Eigen::VectorXi& aabb_indices) {
 }
 
 std::vector<float> VoxelMapping::get_grid_block(const Eigen::VectorXi& aabb_indices) {
-    cudaStreamSynchronize(stream_); // Ensure all kernel operations are complete
+    cudaStreamSynchronize(stream_);
 
     int grid_min_x = aabb_indices[0];
     int grid_max_x = aabb_indices[1];
@@ -105,29 +105,29 @@ std::vector<float> VoxelMapping::get_grid_block(const Eigen::VectorXi& aabb_indi
 
     cudaMemcpy3DParms copyParams = {0};
 
-    // Source: d_voxel_grid (z-major order: z varies fastest, then y, then x)
-    // The pitch is the stride between y-planes (size_x * size_z * sizeof(float))
+    // Source: d_voxel_grid (Z-X-Y major order: Z varies fastest, then X, then Y)
+    // The pitch is the stride between X-planes (size_z * sizeof(float))
     copyParams.srcPtr = make_cudaPitchedPtr(
-        d_voxel_grid_ + (grid_min_x * size_y_ * size_z_ + grid_min_y * size_z_ + grid_min_z),
-        size_z_ * sizeof(float), // Pitch (stride in bytes between y-planes, z-major)
-        size_z_,                 // Width in elements (z-dimension)
-        size_y_                  // Height in elements (y-dimension)
+        d_voxel_grid_ + (grid_min_y * size_x_ * size_z_ + grid_min_x * size_z_ + grid_min_z),
+        size_z_ * sizeof(float), // Pitch (stride in bytes between x-planes)
+        size_z_,                 // Width in elements (y-dimension)
+        size_x_                  // Height in elements (x-dimension)
     );
 
-    // Destination: block (z-major order)
+    // Destination: block (Z-X-Y major order)
     // Since block is a flat vector, the pitch matches the z-dimension size
     copyParams.dstPtr = make_cudaPitchedPtr(
         block.data(),
-        aabb_size_z * sizeof(float), // Pitch (stride in bytes between y-planes in AABB)
-        aabb_size_z,                 // Width in elements (z-dimension of AABB)
-        aabb_size_y                  // Height in elements (y-dimension of AABB)
+        aabb_size_z * sizeof(float), // Pitch (stride in bytes between x-planes in AABB)
+        aabb_size_z,                 // Width in elements (y-dimension of AABB)
+        aabb_size_x                  // Height in elements (x-dimension of AABB)
     );
 
-    // Extent of the region to copy (AABB subregion in z-major order)
+    // Extent of the region to copy (AABB subregion in Z-X-Y major order)
     copyParams.extent = make_cudaExtent(
         aabb_size_z * sizeof(float), // Width in bytes (z-dimension)
-        aabb_size_y,                 // Height in elements (y-dimension)
-        aabb_size_x                  // Depth in elements (x-dimension)
+        aabb_size_x,                 // Height in elements (x-dimension)
+        aabb_size_y                  // Depth in elements (y-dimension)
     );
 
     copyParams.kind = cudaMemcpyDeviceToHost;
