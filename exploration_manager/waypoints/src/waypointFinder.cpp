@@ -29,6 +29,10 @@ WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const Params &new
 
 void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d dronePosition, const Eigen::VectorXi &aabb){
     //sets seen points and obstacles
+
+    //joergen sends me a row major, so lets transpose
+    subGrid.transposeInPlace();
+
     Point offset = {aabb(0), aabb(2)};
 
     for (int x = 0; x < subGrid.rows(); x++){
