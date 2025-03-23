@@ -32,7 +32,7 @@ class WaypointFinder {
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> obstacles; // Eigen matrix of obstacle mask
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> unreachableMask; // unreachable waypoints. resets every time we update the grid
 
-    Eigen::Vector2i waypoint; //waypoint in meters
+    Eigen::Vector2i waypoint; //waypoint in grid coordinates
 
     void initGaussian();
     double tileUtility(const double value, const double distance);
