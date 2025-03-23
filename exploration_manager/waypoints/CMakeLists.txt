@@ -10,9 +10,11 @@ find_package(Eigen3 REQUIRED)
 # Include directories
 include_directories(${OpenCV_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS})
 
+include_directories(include)
+
 # Source files
 set(SOURCES
-    src/waypoints.cpp
+    src/waypointFinder.cpp
 )
 
 # Add the library

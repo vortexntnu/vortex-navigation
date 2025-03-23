@@ -21,6 +21,7 @@ find_package(vortex_msgs REQUIRED)
 
 # Add subdirectory for the Grid module (handles its own CUDA setup)
 add_subdirectory(voxel_mapping)
+add_subdirectory(waypoints)
 
 include_directories(include)
 
