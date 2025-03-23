@@ -207,11 +207,11 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
     sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
 
     size_t point_count = 0;
-    for (size_t x = 0; x < aabb_size_x; ++x) {
-        for (size_t y = 0; y < aabb_size_y; ++y) {
+    for (size_t y = 0; y < aabb_size_y; ++y) {
+        for (size_t x = 0; x < aabb_size_x; ++x) {
             for (size_t z = 0; z < aabb_size_z; ++z) {
-                // Z-major index: x * (size_y * size_z) + y * size_z + z
-                size_t idx = x * (aabb_size_y * aabb_size_z) + y * aabb_size_z + z;
+                // Z-major index: y * (size_x * size_z) + x * size_z + z
+                size_t idx = y * (aabb_size_x * aabb_size_z) + x * aabb_size_z + z;
                 if (idx < block.size()) {
                     float value = block[idx];
                     if (value > this->get_parameter("voxel_mapping.occupancy_threshold").as_double()) {
@@ -375,13 +375,13 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
     sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
 
     double voxel_resolution_ = this->get_parameter("voxel_mapping.grid_resolution").as_double();
-    int min_z = aabb_indices[4];  // Assuming min_z is stored in aabb_indices[4]
-    int max_z = aabb_indices[5];  // Assuming max_z is stored in aabb_indices[5]
+    int min_z = aabb_indices[4];
+    int max_z = aabb_indices[5];
     float z_value = static_cast<float>(min_z + max_z)/2 * voxel_resolution_;
 
-    for (int x = 0; x < width; ++x) {
-        for (int y = 0; y < height; ++y) {
-            int idx = x * height + y;
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int idx = y * width + x;
             if (idx < slice.size()) {
                 *iter_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
                 *iter_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;

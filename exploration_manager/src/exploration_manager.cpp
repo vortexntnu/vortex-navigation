@@ -4,18 +4,18 @@ ExplorationManager::ExplorationManager(/* args */) {
 }
 
 ExplorationManager::~ExplorationManager() {
-    mapper_.~VoxelMapping();
+    mapper_->~VoxelMapping();
 }
 
 void ExplorationManager::initialize_mapper(MapperParams params) {
-    mapper_ = VoxelMapping(params.resolution, params.size_x, params.size_y, params.size_z, params.min_depth, params.max_depth, params.log_odds_occupied, params.log_odds_free, params.log_odds_min, params.log_odds_max, params.occupancy_threshold, params.free_threshold);
+    mapper_ = std::make_unique<VoxelMapping>(params.resolution, params.size_x, params.size_y, params.size_z, params.min_depth, params.max_depth, params.log_odds_occupied, params.log_odds_free, params.log_odds_min, params.log_odds_max, params.occupancy_threshold, params.free_threshold);
     set_mapper_params(params);
 }
 
 void ExplorationManager::set_image_properties(const ImageProperties& image_properties) {
     image_properties_ = image_properties;
-    mapper_.set_K(image_properties.fx, image_properties.fy, image_properties.cx, image_properties.cy);
-    mapper_.set_image_size(image_properties.width, image_properties.height);
+    mapper_->set_K(image_properties.fx, image_properties.fy, image_properties.cx, image_properties.cy);
+    mapper_->set_image_size(image_properties.width, image_properties.height);
 }
 
 std::vector<Eigen::Vector4f> ExplorationManager::compute_frustum_corners() {
@@ -96,9 +96,9 @@ void ExplorationManager::process_depth_image(const float* depth_image) {
     last_aabb_ = aabb;
     Eigen::VectorXi aabb_indices = get_aabb_indices(aabb);
 
-    mapper_.integrate_depth(depth_image, T, aabb_indices);
+    mapper_->integrate_depth(depth_image, T, aabb_indices);
 
-    updated_block_ = mapper_.get_grid_block(aabb_indices);
+    updated_block_ = mapper_->get_grid_block(aabb_indices);
 }
 
 void ExplorationManager::exploration_timer_callback() {
@@ -111,8 +111,8 @@ void ExplorationManager::exploration_timer_callback() {
     slice_indices[5] = std::min(static_cast<int>(get_mapper_params().size_z - 1), static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
     
     std::vector<float> slice;
-    // mapper_.extract_slice(slice_indices, slice);
-    mapper_.extract_dialated_slice(slice_indices, slice, 3);
+    // mapper_->extract_slice(slice_indices, slice);
+    mapper_->extract_dialated_slice(slice_indices, slice, 3);
 
     if (ros_callback_) {
         ros_callback_(slice, slice_indices);

@@ -16,7 +16,7 @@ def generate_launch_description():
         executable="exploration_manager_node",
         name="exploration_manager_node",
         parameters=[config_file,
-        # {'use_sim_time': True}
+        {'use_sim_time': True}
         ],
         output="screen",
     )

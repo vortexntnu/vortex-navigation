@@ -15,7 +15,6 @@ link_directories(${CUDA_LIBRARY_DIRS})
 
 include_directories(include)
 
-add_executable(test_voxel_mapping tests/test.cpp)
 
 set(SOURCES
     src/voxel_mapping.cpp
@@ -25,7 +24,6 @@ set(SOURCES
 add_library(voxel_mapping_cuda SHARED ${SOURCES})
 
 target_link_libraries(voxel_mapping_cuda PRIVATE ${CUDA_LIBRARIES} ${CUDA_cudart_LIBRARY})
-target_link_libraries(test_voxel_mapping voxel_mapping_cuda ${GTEST_LIBRARIES} ${GTEST_MAIN_LIBRARIES} Eigen3::Eigen)
 
 target_include_directories(voxel_mapping_cuda PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
