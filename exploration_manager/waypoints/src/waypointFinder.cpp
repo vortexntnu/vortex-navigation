@@ -70,7 +70,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f 
 
     //find new waypoint
     if (distance(waypoint, dronePosition.head(2)) < params.gridSize){
-        findWaypoint(dronePosition.head(2));
+        findWaypoint(dronePosition);
     }
 
     //since the obstacle map is updated, we need to recheck if waypoints are reachable
@@ -129,9 +129,13 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
 }
 
 void WaypointFinder::waypointUnreachable(const Eigen::Vector3f &dronePosition){
-    //TODO account for out of range
-    unreachableMask.block(waypoint(0) - params.unreachableBlacklist, waypoint(1) - params.unreachableBlacklist, 2*params.unreachableBlacklist, 2*params.unreachableBlacklist) 
-        = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Ones(2*params.unreachableBlacklist, 2*params.unreachableBlacklist);
+    int topX = std::min(waypoint(0) + params.unreachableBlacklist, static_cast<int>(values.cols()));
+    int topY = std::min(waypoint(1) + params.unreachableBlacklist, static_cast<int>(values.rows()));
+    int bottomX = std::max(waypoint(0) - params.unreachableBlacklist, 0);
+    int bottomY = std::max(waypoint(1) - params.unreachableBlacklist, 0);
     
-    findWaypoint(dronePosition.head(2));
+    unreachableMask.block(bottomX, bottomY, topX, topY)
+        = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Ones(topX - bottomX, topY - bottomY);
+
+    findWaypoint(dronePosition);
 }
