@@ -37,6 +37,8 @@ class WaypointFinder {
     void initGaussian();
     double tileUtility(const double value, const double distance);
 
+    void findWaypoint(const Eigen::Vector3f &dronePosition);
+
     public:
         WaypointFinder(){};
         WaypointFinder(const Eigen::Vector2i gridSize, const Params &newParams);
@@ -45,7 +47,6 @@ class WaypointFinder {
         //dronePosition is the current drone xy position in meters
         void updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f &dronePosition, const Eigen::VectorXi &aabb);
 
-        void findWaypoint(const Eigen::Vector3f &dronePosition);
         void waypointUnreachable(const Eigen::Vector3f &dronePosition);
 
         Eigen::Vector2d getWaypoint(){
