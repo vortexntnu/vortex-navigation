@@ -10,8 +10,8 @@ double WaypointFinder::tileUtility(const double value, const double distance){
 }
 
 void WaypointFinder::initGaussian(){
-    for (int x = 0; x < values.rows(); x++){
-        for (int y = 0; y < values.cols(); y++){
+    for (int x = 0; x < values.cols(); x++){
+        for (int y = 0; y < values.rows(); y++){
             values(x, y) = exp(-1*(
                 pow(x-params.centerX, 2)/(2*pow(params.sigmaX, 2)) + 
                 pow(y-params.centerY, 2)/(2*pow(params.sigmaY, 2))));
@@ -23,11 +23,12 @@ WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const Params &new
     params = newParams;
     values = Eigen::MatrixXd::Zero(gridSize(0), gridSize(1));
     obstacles = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(gridSize(0), gridSize(1));
+    unreachableMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(gridSize(0), gridSize(1));
     
     initGaussian();
 }
 
-void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d dronePosition, const Eigen::VectorXi &aabb){
+void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f &dronePosition, const Eigen::VectorXi &aabb){
     //sets seen points and obstacles
 
     //joergen sends me a row major, so lets transpose
@@ -35,8 +36,8 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d 
 
     Point offset = {aabb(0), aabb(2)};
 
-    for (int x = 0; x < subGrid.rows(); x++){
-        for (int y = 0; y < subGrid.cols(); y++){
+    for (int x = 0; x < subGrid.cols(); x++){
+        for (int y = 0; y < subGrid.rows(); y++){
             if (subGrid(x, y) == 1){
                 obstacles(x+offset.x, y+offset.y) = true;
             }
@@ -54,7 +55,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d 
             int coordX = x/params.gridSize;
             int coordY = y/params.gridSize;
 
-            if (coordX < 0|| coordX > values.rows() || coordY < 0 && coordY > values.cols()){
+            if (coordX < 0|| coordX > values.cols() || coordY < 0 && coordY > values.rows()){
                 continue;
             }
 
@@ -63,15 +64,26 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector2d 
             }
         }
     }
+
+    //transposes back
+    subGrid.transposeInPlace();
+
+    //find new waypoint
+    if (distance(waypoint, dronePosition.head(2)) < params.gridSize){
+        findWaypoint(dronePosition.head(2));
+    }
+
+    //since the obstacle map is updated, we need to recheck if waypoints are reachable
+    unreachableMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(values.cols(), values.rows());
 }
 
 
 Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> dilateMask(const Eigen::MatrixXd &inputMask, int dilationSize) {
     //this is quite stupid, but I don't really want to make the mask a cv::Mat. maybe later
     //covnert to cv::Mat
-    cv::Mat mask(inputMask.rows(), inputMask.cols(), CV_8U);
-    for (int i = 0; i < inputMask.rows(); ++i) {
-        for (int j = 0; j < inputMask.cols(); ++j) {
+    cv::Mat mask(inputMask.cols(), inputMask.rows(), CV_8U);
+    for (int i = 0; i < inputMask.cols(); ++i) {
+        for (int j = 0; j < inputMask.rows(); ++j) {
             mask.at<uchar>(i, j) = inputMask(i, j) ? 255 : 0;
         }
     }
@@ -84,26 +96,26 @@ Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> dilateMask(const Eigen::Matr
 
     // convert the dilated mask back to a vector
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> outputMask;
-    outputMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(inputMask.rows(), inputMask.cols());
+    outputMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(inputMask.cols(), inputMask.rows());
 
-    for (int i = 0; i < dilatedMask.rows; ++i) {
-        for (int j = 0; j < dilatedMask.cols; ++j) {
+    for (int i = 0; i < dilatedMask.cols; ++i) {
+        for (int j = 0; j < dilatedMask.rows; ++j) {
             outputMask(i, j) = dilatedMask.at<uchar>(i, j) > 0;
         }
     }
     return outputMask;
 }
 
-Point WaypointFinder::getWaypoint(const Eigen::Vector2d dronePosition){
+void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
     Point maxPoint = {params.centerX, params.centerY};
     double maxUtility = 0;
 
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> obstaclesWithBuffer;
     obstaclesWithBuffer = dilateMask(obstacles, params.obstaclesMargin);
 
-    for (int x = 0; x < values.rows(); x++){
-        for (int y = 0; y < values.cols(); y++){
-            if (obstaclesWithBuffer(x, y)){
+    for (int x = 0; x < values.cols(); x++){
+        for (int y = 0; y < values.rows(); y++){
+            if (obstaclesWithBuffer(x, y) || unreachableMask(x, y)){
                 continue;
             }
             double utility = tileUtility(values(x, y), distance(Eigen::Vector2d{x, y}, dronePosition));
@@ -113,5 +125,13 @@ Point WaypointFinder::getWaypoint(const Eigen::Vector2d dronePosition){
             }
         }
     }
-    return maxPoint;
+    waypoint = {maxPoint.x, maxPoint.y};
+}
+
+void WaypointFinder::waypointUnreachable(const Eigen::Vector3f &dronePosition){
+    //TODO account for out of range
+    unreachableMask.block(waypoint(0) - params.unreachableBlacklist, waypoint(1) - params.unreachableBlacklist, 2*params.unreachableBlacklist, 2*params.unreachableBlacklist) 
+        = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Ones(2*params.unreachableBlacklist, 2*params.unreachableBlacklist);
+    
+    findWaypoint(dronePosition.head(2));
 }
