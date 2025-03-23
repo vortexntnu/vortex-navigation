@@ -12,10 +12,6 @@ VoxelMapping::VoxelMapping(float resolution, uint size_x, uint size_y, uint size
     init_grid();
 }
 
-VoxelMapping::VoxelMapping() {
-
-}
-
 void VoxelMapping::init_grid() {
     size_t matrix_size = size_x_ * size_y_ * size_z_ * sizeof(float);
 

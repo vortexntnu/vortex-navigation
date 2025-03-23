@@ -4,6 +4,7 @@
 #include <voxel_mapping.hpp>
 #include <Eigen/Dense>
 #include <functional>
+#include <memory>
 
 struct MapperParams {
     float resolution;
@@ -75,7 +76,7 @@ class ExplorationManager {
      * 
      * @return VoxelMapping& Reference to the voxel mapper.
      */
-    VoxelMapping& get_mapper() { return mapper_; }
+    VoxelMapping& get_mapper() { return *mapper_; }
 
     /**
      * @brief Set the transformation from map to odom frame.
@@ -203,7 +204,7 @@ class ExplorationManager {
     std::function<void(const std::vector<float>&, const Eigen::VectorXi&)> ros_callback_;
 
     private:
-    VoxelMapping mapper_;
+    std::unique_ptr<VoxelMapping> mapper_;
     MapperParams mapper_params_;
     Eigen::Matrix4f map_to_odom_tf_;
     Eigen::Matrix4f cam_transform_;

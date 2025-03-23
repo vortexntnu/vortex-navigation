@@ -30,7 +30,6 @@ extern "C" void launch_extract_dilated_2d_slice_kernel(
 class VoxelMapping {
 public:
     VoxelMapping(float resolution, uint size_x, uint size_y, uint size_z, float min_depth, float max_depth, float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold);
-    VoxelMapping();
     ~VoxelMapping();
     void set_K(float fx, float fy, float cx, float cy);
     void set_image_size(int width, int height);
