@@ -26,3 +26,14 @@
       occupancy_threshold: 3.0
       free_threshold: -3.0
 
+    waypoint:
+      sigmaX: 1
+      sigmaY: 1
+      centerX: 5
+      centerY: 0
+      localBias: 1
+      obstaclesMargin: 5
+      searchRadius: 0.5
+      gridSize: 0.1
+      unreachableBlacklist: 10
+
