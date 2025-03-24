@@ -1,4 +1,5 @@
 #include <exploration_manager/exploration_manager_ros.hpp>
+#include <nvToolsExt.h>
 
 using std::placeholders::_1;
 
@@ -146,6 +147,7 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
     if (!camera_info_received_) {
         return;
     }
+    nvtxRangePush("depthImageCallback");
     geometry_msgs::msg::TransformStamped transform;
     try {
         transform = tf_buffer_->lookupTransform(map_frame_, optical_frame_, msg->header.stamp);
@@ -159,9 +161,11 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
     exploration_manager_.set_cam_pos_map_frame(Eigen::Vector3f(transform.transform.translation.x,
                                                               transform.transform.translation.y,
                                                               transform.transform.translation.z));
-    exploration_manager_.set_cam_transform(T);
-
+                                                              exploration_manager_.set_cam_transform(T);
+                                                              
+    nvtxRangePush("processdepthImageCallback");
     exploration_manager_.process_depth_image(reinterpret_cast<const float*>(msg->data.data()));
+    nvtxRangePop();
 
     AABB aabb = exploration_manager_.get_last_aabb();
     publish_aabb_marker(aabb);
@@ -232,6 +236,7 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
 
     modifier.resize(point_count);
     point_cloud_pub_->publish(cloud_msg);
+    nvtxRangePop();
 }
 
 void ExplorationManagerNode::timer_callback() {
@@ -351,6 +356,7 @@ void ExplorationManagerNode::dvl_altitude_callback(const vortex_msgs::msg::DVLAl
 }
 
 void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, const Eigen::VectorXi& aabb_indices) {
+    nvtxRangePush("publishSlice");
     sensor_msgs::msg::PointCloud2 cloud_msg;
     cloud_msg.header.stamp = this->get_clock()->now();
     cloud_msg.header.frame_id = map_frame_;
@@ -402,6 +408,7 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
     }
 
     pointcloud_slice_pub_->publish(cloud_msg);
+    nvtxRangePop();
 }
 
 RCLCPP_COMPONENTS_REGISTER_NODE(ExplorationManagerNode)

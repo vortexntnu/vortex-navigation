@@ -41,7 +41,7 @@ public:
 
     void extract_slice(const Eigen::VectorXi& indices, std::vector<float>& slice);
 
-    void extract_dialated_slice(const Eigen::VectorXi& indices, std::vector<float>& slice, int dialation_size);
+    void extract_dilated_slice(const Eigen::VectorXi& indices, std::vector<float>& slice, int radius);
     
 private:
     void init_grid();

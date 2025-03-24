@@ -111,8 +111,9 @@ void ExplorationManager::exploration_timer_callback() {
     slice_indices[5] = std::min(static_cast<int>(get_mapper_params().size_z - 1), static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
     
     std::vector<float> slice;
+    int radius = 3;
     // mapper_->extract_slice(slice_indices, slice);
-    mapper_->extract_dialated_slice(slice_indices, slice, 3);
+    mapper_->extract_dilated_slice(slice_indices, slice, radius);
 
     if (ros_callback_) {
         ros_callback_(slice, slice_indices);

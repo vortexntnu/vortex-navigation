@@ -177,7 +177,7 @@ void VoxelMapping::extract_slice(const Eigen::VectorXi& indices, std::vector<flo
     cudaFree(d_slice);
 }
 
-void VoxelMapping::extract_dialated_slice(const Eigen::VectorXi& indices, std::vector<float>& slice, int dilation_size) {
+void VoxelMapping::extract_dilated_slice(const Eigen::VectorXi& indices, std::vector<float>& slice, int radius) {
     int min_x = indices[0];
     int max_x = indices[1];
     int min_y = indices[2];
@@ -205,7 +205,7 @@ void VoxelMapping::extract_dialated_slice(const Eigen::VectorXi& indices, std::v
         std::cerr << "CUDA memset failed for 2d slice: " << cudaGetErrorString(err) << std::endl;
     }
 
-    launch_extract_dilated_2d_slice_kernel(d_voxel_grid_, d_slice, min_x, max_x, min_y, max_y, min_z, max_z, dilation_size, stream_);
+    launch_extract_dilated_2d_slice_kernel(d_voxel_grid_, d_slice, min_x, max_x, min_y, max_y, min_z, max_z, radius, stream_);
 
     cudaStreamSynchronize(stream_);
 
