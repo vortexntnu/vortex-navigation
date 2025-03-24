@@ -320,8 +320,48 @@ __global__ void extract_dilated_slice_kernel(
     if(shared_voxel[SHARED_INDEX(block_x, block_y)] == 1.0f) {
         for (int i = -dilation_size; i <= dilation_size; ++i) {
             for (int j = -dilation_size; j <= dilation_size; ++j) {
+                if (block_x + i < 0 || block_x + i >= blockDim.x || block_y + j < 0 || block_y + j >= blockDim.y) continue;
                 shared_voxel[SHARED_INDEX(block_x + i, block_y + j)] = 1.0f;
             }    
+        }
+    }
+
+    __syncthreads();
+
+    if(block_x < dilation_size && slice_x - dilation_size >= 0) {
+        if(shared_voxel[SHARED_INDEX(block_x - dilation_size, block_y)] == 1.0f) {
+            for (int i = 0; i <= dilation_size; ++i) {
+                for (int j = -dilation_size; j <= dilation_size; ++j) {
+                    shared_voxel[SHARED_INDEX(block_x - dilation_size + i, block_y + j)] = 1.0f;
+                }    
+            }
+        }
+    }
+    if(block_x >= blockDim.x - dilation_size && slice_x + dilation_size < d_grid_size_x) {
+        if(shared_voxel[SHARED_INDEX(block_x + dilation_size, block_y)] == 1.0f) {
+            for (int i = -dilation_size; i <= 0; ++i) {
+                for (int j = -dilation_size; j <= dilation_size; ++j) {
+                    shared_voxel[SHARED_INDEX(block_x + dilation_size + i, block_y + j)] = 1.0f;
+                }    
+            }
+        }
+    }
+    if(block_y < dilation_size && slice_y - dilation_size >= 0) {
+        if(shared_voxel[SHARED_INDEX(block_x, block_y - dilation_size)] == 1.0f) {
+            for (int i = -dilation_size; i <= dilation_size; ++i) {
+                for (int j = 0; j <= dilation_size; ++j) {
+                    shared_voxel[SHARED_INDEX(block_x + i, block_y - dilation_size + j)] = 1.0f;
+                }    
+            }
+        }
+    }
+    if(block_y >= blockDim.y - dilation_size && slice_y + dilation_size < d_grid_size_y) {
+        if(shared_voxel[SHARED_INDEX(block_x, block_y + dilation_size)] == 1.0f) {
+            for (int i = -dilation_size; i <= dilation_size; ++i) {
+                for (int j = -dilation_size; j <= 0; ++j) {
+                    shared_voxel[SHARED_INDEX(block_x + i, block_y + dilation_size + j)] = 1.0f;
+                }    
+            }
         }
     }
 
