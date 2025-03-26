@@ -25,7 +25,17 @@ extern "C" void launch_extract_2d_slice_kernel(
 extern "C" void launch_extract_dilated_2d_slice_kernel(
     const float* d_voxel_grid, float* d_slice,
     int min_x, int max_x, int min_y, int max_y, int min_z, int max_z, int dilation_size,
-    cudaStream_t stream); 
+    cudaStream_t stream);
+
+extern "C" void launch_extract_binary_slice_kernel(
+    const float* d_voxel_grid, float* d_slice,
+    int min_x, int max_x, int min_y, int max_y, int min_z, int max_z,
+    cudaStream_t stream);
+
+extern "C" void launch_edt_kernels(
+    float* d_binary_slice, float* d_edt,
+    int width, int height,
+    cudaStream_t stream);
 
 class VoxelMapping {
 public:
@@ -42,6 +52,8 @@ public:
     void extract_slice(const Eigen::VectorXi& indices, std::vector<float>& slice);
 
     void extract_dilated_slice(const Eigen::VectorXi& indices, std::vector<float>& slice, int radius);
+
+    void extract_esdf(const Eigen::VectorXi& indices, std::vector<float>& esdf);
     
 private:
     void init_grid();

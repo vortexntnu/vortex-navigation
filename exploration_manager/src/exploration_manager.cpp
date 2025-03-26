@@ -119,6 +119,13 @@ void ExplorationManager::exploration_timer_callback() {
         ros_callback_(slice, slice_indices);
     }
 
+    std::vector<float> esdf;
+    mapper_->extract_esdf(slice_indices, esdf);
+
+    if (esdf_callback_) {
+        esdf_callback_(esdf, slice_indices);
+    }
+
 
     // pass this vector to your class.
     // can use Eigen::Map https://eigen.tuxfamily.org/dox/classEigen_1_1Map.html

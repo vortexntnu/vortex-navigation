@@ -46,6 +46,8 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     void publish_slice(const std::vector<float>& slice, const Eigen::VectorXi& aabb_indices);
 
+    void publish_esdf(const std::vector<float>& esdf, const Eigen::VectorXi& aabb_indices);
+
    private:
 
     ExplorationManager exploration_manager_;
@@ -65,6 +67,8 @@ class ExplorationManagerNode : public rclcpp::Node {
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_pub_;
 
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_slice_pub_;
+
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_esdf_pub_;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 

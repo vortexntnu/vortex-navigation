@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <nvToolsExt.h>
+#include <cfloat>
 
 __constant__ float d_intrinsics[4];
 __constant__ uint d_image_width;
@@ -245,6 +246,50 @@ extern "C" void launch_extract_2d_slice_kernel(
         min_x, max_x, min_y, max_y, min_z, max_z);
 }
 
+__global__ void extract_binary_slice_kernel(
+    const float* d_voxel_grid, float* d_slice,
+    int min_x, int max_x, int min_y, int max_y, int min_z, int max_z) {
+    
+    int slice_x = blockIdx.x * blockDim.x + threadIdx.x;
+    int slice_y = blockIdx.y * blockDim.y + threadIdx.y;
+    int slice_size_x = max_x - min_x + 1;
+    int slice_size_y = max_y - min_y + 1;
+
+    if (slice_x >= slice_size_x || slice_y >= slice_size_y) return;
+    
+    int global_x = slice_x + min_x;
+    int global_y = slice_y + min_y;
+    
+    if (global_x < 0 || global_x >= d_grid_size_x ||
+        global_y < 0 || global_y >= d_grid_size_y) return;
+
+    float state = FLT_MAX;  // Default: unknown
+    for (int z = min_z; z <= max_z; ++z) {
+        int grid_idx = VOXEL_INDEX(global_x, global_y, z, d_grid_size_x, d_grid_size_y, d_grid_size_z);
+        float log_odds = d_voxel_grid[grid_idx];
+
+        if (log_odds >= d_occupancy_threshold) {
+            state = 0;  // Occupied
+            break;
+        }
+    }
+    if (state != FLT_MAX) {
+        d_slice[SLICE_INDEX(slice_x, slice_y, slice_size_x)] = state;
+    }
+}
+
+extern "C" void launch_extract_binary_slice_kernel(
+    const float* d_voxel_grid, float* d_slice,
+    int min_x, int max_x, int min_y, int max_y, int min_z, int max_z,
+    cudaStream_t stream) {
+
+    dim3 threads(16, 16);
+    dim3 blocks((max_x - min_x + 15) / 16, (max_y - min_y + 15) / 16);
+    extract_binary_slice_kernel<<<blocks, threads, 0, stream>>>(
+        d_voxel_grid, d_slice,
+        min_x, max_x, min_y, max_y, min_z, max_z);
+}
+
 __global__ void extract_dilated_slice_kernel(
     const float* d_voxel_grid, float* d_slice,
     int min_x, int max_x, int min_y, int max_y, int min_z, int max_z, int dilation_size) {
@@ -386,3 +431,99 @@ extern "C" void launch_extract_dilated_2d_slice_kernel(
     nvtxRangePop();
 }
 
+__global__ void edt_col_kernel(float* img, float* out, int width, int height) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y;
+
+    if (x >= height || y >= width) return;
+
+    int rowsPerThread = (height + blockDim.x - 1) / blockDim.x;
+    int untilPixel = min(x + rowsPerThread, height);
+
+    extern __shared__ float img_col[];
+
+    for (int row = threadIdx.x; row < height; row += blockDim.x) {
+        img_col[row] = img[row * width + y];
+    }
+    __syncthreads();
+
+    for (int row = x; row < untilPixel; row += blockDim.x) {
+        float value = img_col[row];
+
+        for (int row_i = 1, d = 1; row_i <= height - row - 1; row_i++) {
+            if (row + row_i < height) {
+                value = fminf(value, img_col[row + row_i] + d);
+            }
+            d += 1 + 2 * row_i;
+        }
+
+        for (int row_i = 1, d = 1; row_i <= row; row_i++) {
+            if (row - row_i >= 0) {
+                value = fminf(value, img_col[row - row_i] + d);
+            }
+            d += 1 + 2 * row_i;
+        }
+
+        out[row * width + y] = value;
+    }
+}
+
+__global__ void edt_row_kernel(float* out, int width, int height) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * width;
+
+    if (x >= width || y / width >= height) return;
+
+    int colsPerThread = (width + blockDim.x - 1) / blockDim.x;
+    int untilPixel = min(x + colsPerThread, width);
+
+    extern __shared__ float imgRow[];
+
+    for (int col = threadIdx.x; col < width; col += blockDim.x) {
+        imgRow[col] = out[y + col];
+    }
+    __syncthreads();
+
+    for (int col = x; col < untilPixel; col += blockDim.x) {
+        float value = imgRow[col];
+
+        for (int col_i = 1, d = 1; col_i <= width - col - 1; col_i++) {
+            if (col + col_i < width) {
+                value = fminf(value, imgRow[col + col_i] + d);
+            }
+            d += 1 + 2 * col_i;
+        }
+
+        for (int col_i = 1, d = 1; col_i <= col; col_i++) {
+            if (col - col_i >= 0) {
+                value = fminf(value, imgRow[col - col_i] + d);
+            }
+            d += 1 + 2 * col_i;
+        }
+
+        out[y + col] = value;
+    }
+}
+
+extern "C" void launch_edt_kernels(float* d_binary_slice, float* d_edt, int width, int height, cudaStream_t stream) {
+    int threadsPerBlock = 256;
+
+    dim3 blockDim(threadsPerBlock, 1);
+    dim3 gridDim((height + threadsPerBlock - 1) / threadsPerBlock, width);
+    edt_col_kernel<<<gridDim, blockDim, height * sizeof(float), stream>>>(d_binary_slice, d_edt, width, height);
+
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Error after Phase 1: " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    dim3 gridDim2((width + threadsPerBlock - 1) / threadsPerBlock, height);
+    edt_row_kernel<<<gridDim2, blockDim, width * sizeof(float), stream>>>(d_edt, width, height);
+
+    err = cudaGetLastError();
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA Error after Phase 2: " << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}

@@ -83,7 +83,12 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     pointcloud_slice_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "point_cloud_slice", qos);
 
+    pointcloud_esdf_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "point_cloud_esdf", qos);
+
     exploration_manager_.ros_callback_ = std::bind(&ExplorationManagerNode::publish_slice, this, std::placeholders::_1, std::placeholders::_2);
+
+    exploration_manager_.esdf_callback_ = std::bind(&ExplorationManagerNode::publish_esdf, this, std::placeholders::_1, std::placeholders::_2);
 
 }
 
@@ -240,6 +245,11 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
 }
 
 void ExplorationManagerNode::timer_callback() {
+    AABB aabb = exploration_manager_.get_last_aabb();
+    Eigen::VectorXi aabb_indices = exploration_manager_.get_aabb_indices(aabb);
+    if (aabb_indices[0] == 0 || aabb_indices[1] == 0 || aabb_indices[2] == 0 || aabb_indices[3] == 0 || aabb_indices[4] == 0 || aabb_indices[5] == 0) {
+        return;
+    }
     exploration_manager_.exploration_timer_callback();
 }
 
@@ -408,6 +418,56 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
     }
 
     pointcloud_slice_pub_->publish(cloud_msg);
+    nvtxRangePop();
+}
+
+void ExplorationManagerNode::publish_esdf(const std::vector<float>& esdf, const Eigen::VectorXi& aabb_indices) {
+    nvtxRangePush("publishEsdf");
+    sensor_msgs::msg::PointCloud2 cloud_msg;
+    cloud_msg.header.stamp = this->get_clock()->now();
+    cloud_msg.header.frame_id = map_frame_;
+    cloud_msg.is_dense = false;
+
+    int width = aabb_indices[1] - aabb_indices[0] + 1;
+    int height = aabb_indices[3] - aabb_indices[2] + 1;
+
+    sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
+    modifier.setPointCloud2Fields(
+        4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
+
+    modifier.resize(width * height);
+    sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
+
+    double voxel_resolution_ = this->get_parameter("voxel_mapping.grid_resolution").as_double();
+    int min_z = aabb_indices[4];
+    int max_z = aabb_indices[5];
+    float z_value = static_cast<float>(min_z + max_z)/2 * voxel_resolution_;
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int idx = y * width + x;
+            if (idx < esdf.size()) {
+                *iter_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
+                *iter_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
+                *iter_z = z_value;
+                *iter_intensity = esdf[idx];
+                ++iter_x;
+                ++iter_y;
+                ++iter_z;
+                ++iter_intensity;
+            }
+        }
+    }
+
+    pointcloud_esdf_pub_->publish(cloud_msg);
     nvtxRangePop();
 }
 

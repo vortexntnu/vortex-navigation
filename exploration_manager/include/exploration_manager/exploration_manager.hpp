@@ -203,6 +203,8 @@ class ExplorationManager {
 
     std::function<void(const std::vector<float>&, const Eigen::VectorXi&)> ros_callback_;
 
+    std::function<void(const std::vector<float>&, const Eigen::VectorXi&)> esdf_callback_;
+
     private:
     std::unique_ptr<VoxelMapping> mapper_;
     MapperParams mapper_params_;

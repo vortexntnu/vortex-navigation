@@ -1,6 +1,7 @@
 #include <voxel_mapping.hpp>
 #include <iostream>
 #include <vector>
+#include <cfloat>
 
 VoxelMapping::VoxelMapping(float resolution, uint size_x, uint size_y, uint size_z, float min_depth, float max_depth, float log_odds_occupied, float log_odds_free, float log_odds_min, float log_odds_max, float occupancy_threshold, float free_threshold)
     : size_x_(size_x), size_y_(size_y), size_z_(size_z), min_depth_(min_depth), max_depth_(max_depth), log_odds_occupied_(log_odds_occupied), log_odds_free_(log_odds_free), log_odds_min_(log_odds_min), log_odds_max_(log_odds_max), occupancy_threshold_(occupancy_threshold), free_threshold_(free_threshold) {
@@ -215,6 +216,58 @@ void VoxelMapping::extract_dilated_slice(const Eigen::VectorXi& indices, std::ve
     }
 
     cudaFree(d_slice);
+}
+
+void VoxelMapping::extract_esdf(const Eigen::VectorXi& indices, std::vector<float>& esdf) {
+    int min_x = indices[0];
+    int max_x = indices[1];
+    int min_y = indices[2];
+    int max_y = indices[3];
+    int min_z = indices[4];
+    int max_z = indices[5];
+
+    size_t esdf_size_x = max_x - min_x + 1;
+    size_t esdf_size_y = max_y - min_y + 1;
+    size_t slice_size_z = max_z - min_z + 1;
+
+    size_t esdf_size = esdf_size_x * esdf_size_y;
+
+    esdf.resize(esdf_size);
+
+    float* d_binary_slice;
+
+    cudaError_t err = cudaMalloc(&d_binary_slice, esdf_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for binary slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    err = cudaMemset(d_binary_slice, FLT_MAX, esdf_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memset failed for binary slice: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    launch_extract_binary_slice_kernel(d_voxel_grid_, d_binary_slice, min_x, max_x, min_y, max_y, min_z, max_z, stream_);
+
+    float* d_esdf;
+
+    err = cudaMalloc(&d_esdf, esdf_size * sizeof(float));
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA malloc failed for esdf: " << cudaGetErrorString(err) << std
+            ::endl;
+    }
+
+    cudaStreamSynchronize(stream_);
+
+    launch_edt_kernels(d_binary_slice, d_esdf, esdf_size_x, esdf_size_y, stream_);
+
+    cudaStreamSynchronize(stream_);
+
+    err = cudaMemcpy(esdf.data(), d_esdf, esdf_size * sizeof(float), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA memcpy failed for esdf: " << cudaGetErrorString(err) << std::endl;
+    }
+
+    cudaFree(d_binary_slice);
 }
 
 void VoxelMapping::integrate_depth(const float* depth_image, const Eigen::Matrix4f& transform, const Eigen::VectorXi& aabb_indices) {
