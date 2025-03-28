@@ -63,7 +63,7 @@ class ExplorationManager {
      * 
      * @param params Parameters for the waypoint finder.
      */
-    void initializeWaypoints(WaypointParams params, const Eigen::Vector2i gridSize);
+    void initializeWaypointFinder(WaypointParams params, const Eigen::Vector2i gridSize);
 
     /**
      * @brief Set the mapper parameters.

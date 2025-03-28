@@ -7,6 +7,8 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
 
     initialize_mapper_params();
 
+    initializeWaypointFinderParams();
+
     this->declare_parameter<bool>("enu_to_ned");
 
     odom_frame_ =
@@ -107,6 +109,22 @@ void ExplorationManagerNode::initialize_mapper_params() {
     mapper_params.free_threshold = this->declare_parameter<double>("voxel_mapping.free_threshold");
     
     exploration_manager_.initialize_mapper(mapper_params);
+}
+void ExplorationManagerNode::initializeWaypointFinderParams() {
+    WaypointParams waypointParams;
+    int gridSizeX = this->declare_parameter<int>("voxel_mapping.grid_size_x");
+    int gridSizeY = this->declare_parameter<int>("waypointFinder.grid_size_y");
+
+    waypointParams.resolution = this->declare_parameter<double>("waypointFinder.resolution");
+    waypointParams.searchRadius = this->declare_parameter<double>("waypointFinder.searchRadius");
+    waypointParams.centerX = this->declare_parameter<double>("waypointFinder.centerX");
+    waypointParams.centerY = this->declare_parameter<double>("waypointFinder.centerY");
+    waypointParams.sigmaX = this->declare_parameter<double>("waypointFinder.sigmaX");
+    waypointParams.sigmaY = this->declare_parameter<double>("waypointFinder.sigmaY");
+    waypointParams.obstaclesMargin = this->declare_parameter<int>("waypointFinder.obstaclesMargin");
+    waypointParams.unreachableBlacklist = this->declare_parameter<int>("waypointFinder.unreachableBlacklist");
+
+    exploration_manager_.initializeWaypointFinder(waypointParams, {gridSizeX, gridSizeY});
 }
 
 geometry_msgs::msg::TransformStamped ExplorationManagerNode::compute_map_odom_transform() {

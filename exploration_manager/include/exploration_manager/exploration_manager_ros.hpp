@@ -31,6 +31,8 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     void initialize_mapper_params();
 
+    void initializeWaypointFinderParams();
+
     void depth_image_callback(const sensor_msgs::msg::Image::ConstSharedPtr msg);
 
     void camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg);
@@ -50,6 +52,7 @@ class ExplorationManagerNode : public rclcpp::Node {
    private:
 
     ExplorationManager exploration_manager_;
+
 
     bool camera_info_received_ = false;
 

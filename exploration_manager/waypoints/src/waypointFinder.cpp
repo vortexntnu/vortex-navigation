@@ -29,7 +29,7 @@ WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const WaypointPar
     initGaussian();
 }
 
-void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f &dronePosition, const Eigen::VectorXi &aabb){
+void WaypointFinder::updateGrid(Eigen::MatrixXf &subGrid, const Eigen::Vector3f &dronePosition, const Eigen::VectorXi &aabb){
     //sets seen points and obstacles
 
     //joergen sends me a row major, so lets transpose
@@ -49,12 +49,12 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f 
     }
 
     //flag seen points
-    for (int coordX = (dronePosition(0) - params.searchRadius)/params.gridSize; coordX < (dronePosition(0) + params.searchRadius)/params.gridSize; coordX++){
-        for (int coordY = (dronePosition(1) - params.searchRadius)/params.gridSize; coordY < (dronePosition(1) + params.searchRadius)/params.gridSize; coordY++){
+    for (int coordX = (dronePosition(0) - params.searchRadius)/params.resolution; coordX < (dronePosition(0) + params.searchRadius)/params.resolution; coordX++){
+        for (int coordY = (dronePosition(1) - params.searchRadius)/params.resolution; coordY < (dronePosition(1) + params.searchRadius)/params.resolution; coordY++){
             
             //transform based on grid scale difference
-            int x = coordX*params.gridSize;
-            int y = coordY*params.gridSize;
+            int x = coordX*params.resolution;
+            int y = coordY*params.resolution;
 
             if (coordX < 0|| coordX > values.cols() || coordY < 0 && coordY > values.rows()){
                 continue;
@@ -70,7 +70,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f 
     subGrid.transposeInPlace();
 
     //find new waypoint
-    if (distance(waypoint.cast<double>(), dronePosition.head(2).cast<double>()) < params.gridSize){
+    if (distance(waypoint.cast<double>(), dronePosition.head(2).cast<double>()) < params.resolution){
         findWaypoint(dronePosition);
     }
 
@@ -119,7 +119,7 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
             if (obstaclesWithBuffer(x, y) || unreachableMask(x, y)){
                 continue;
             }
-            double utility = tileUtility(values(x, y), distance(Eigen::Vector2d{x*params.gridSize, y*params.gridSize}, dronePosition.head(2).cast<double>()));
+            double utility = tileUtility(values(x, y), distance(Eigen::Vector2d{x*params.resolution, y*params.resolution}, dronePosition.head(2).cast<double>()));
             if (utility > maxUtility){
                 maxUtility = utility;
                 maxPoint = {x, y};

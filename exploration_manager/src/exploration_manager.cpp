@@ -12,7 +12,7 @@ void ExplorationManager::initialize_mapper(MapperParams params) {
     set_mapper_params(params);
 }
 
-void ExplorationManager::initializeWaypoints(WaypointParams params, const Eigen::Vector2i gridSize) {
+void ExplorationManager::initializeWaypointFinder(WaypointParams params, const Eigen::Vector2i gridSize) {
     waypointFinder_ = std::make_unique<WaypointFinder>(gridSize, params);
 }
 
@@ -117,6 +117,17 @@ void ExplorationManager::exploration_timer_callback() {
     std::vector<float> slice;
     // mapper_->extract_slice(slice_indices, slice);
     mapper_->extract_dialated_slice(slice_indices, slice, 3);
+
+    int width = slice_indices[1] - slice_indices[0] + 1;
+    int height = slice_indices[3] - slice_indices[2] + 1;
+
+    Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> 
+    slice_matrix_map(slice.data(), height, width);
+
+    Eigen::MatrixXf slice_matrix = slice_matrix_map;
+
+    waypointFinder_->updateGrid(slice_matrix, orca_pos_map_frame_, aabb_indices);
+
 
     if (ros_callback_) {
         ros_callback_(slice, slice_indices);

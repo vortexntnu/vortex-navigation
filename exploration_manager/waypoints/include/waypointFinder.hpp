@@ -13,7 +13,7 @@ struct WaypointParams{
     double localBias; //how much will the drone prefer to explore close to current location
     int obstaclesMargin; //how many cells around an obstacle are considered untouchable
     double searchRadius; //radius of what is considered seen around the drone (meters)
-    double gridSize = 0.1; //size of each grid cell in meters
+    double resolution = 0.1; //size of each grid cell in meters
     int unreachableBlacklist = 20; //how big a buffer around an unreachable waypoint is considered unreachable
 };
 
@@ -45,12 +45,12 @@ class WaypointFinder {
 
         //subgrid contains data around the drone, 0 is free, 1 is obstacle, -1 is unknown
         //dronePosition is the current drone xy position in meters
-        void updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f &dronePosition, const Eigen::VectorXi &aabb);
+        void updateGrid(Eigen::MatrixXf &subGrid, const Eigen::Vector3f &dronePosition, const Eigen::VectorXi &aabb);
 
         void waypointUnreachable(const Eigen::Vector3f &dronePosition);
 
         Eigen::Vector2d getWaypoint(){
-            return {waypoint(0) * params.gridSize, waypoint(1) * params.gridSize};
+            return {waypoint(0) * params.resolution, waypoint(1) * params.resolution};
         };
 
 };
