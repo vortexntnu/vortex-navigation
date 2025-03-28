@@ -34,6 +34,7 @@ add_library(${LIB_NAME} SHARED
 
 # Link against the voxel_mapping CUDA library
 target_link_libraries(${LIB_NAME} PUBLIC voxel_mapping_cuda)
+target_link_libraries(${LIB_NAME} PUBLIC waypoints)
 
 target_include_directories(${LIB_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -63,7 +64,7 @@ rclcpp_components_register_node(
 
 ament_export_targets(export_${LIB_NAME} HAS_LIBRARY_TARGET)
 install(
-  TARGETS ${LIB_NAME} voxel_mapping_cuda
+  TARGETS ${LIB_NAME} voxel_mapping_cuda waypoints
   EXPORT export_${LIB_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib

@@ -12,6 +12,10 @@ void ExplorationManager::initialize_mapper(MapperParams params) {
     set_mapper_params(params);
 }
 
+void ExplorationManager::initializeWaypoints(WaypointParams params, const Eigen::Vector2i gridSize) {
+    waypointFinder_ = std::make_unique<WaypointFinder>(gridSize, params);
+}
+
 void ExplorationManager::set_image_properties(const ImageProperties& image_properties) {
     image_properties_ = image_properties;
     mapper_->set_K(image_properties.fx, image_properties.fy, image_properties.cx, image_properties.cy);

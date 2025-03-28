@@ -2,6 +2,7 @@
 #define EXPLORATION_MANAGER_HPP
 
 #include <voxel_mapping.hpp>
+#include <waypointFinder.hpp>
 #include <Eigen/Dense>
 #include <functional>
 #include <memory>
@@ -56,6 +57,13 @@ class ExplorationManager {
      * @param params Parameters for the mapper.
      */
     void initialize_mapper(MapperParams params);
+
+    /**
+     * @brief Initialize the waypoint finder with the given parameters.
+     * 
+     * @param params Parameters for the waypoint finder.
+     */
+    void initializeWaypoints(WaypointParams params, const Eigen::Vector2i gridSize);
 
     /**
      * @brief Set the mapper parameters.
@@ -201,11 +209,17 @@ class ExplorationManager {
 
     void exploration_timer_callback();
 
+    const Eigen::Vector2d get_waypoint() const {
+        return waypointFinder_->getWaypoint();
+    }
+
     std::function<void(const std::vector<float>&, const Eigen::VectorXi&)> ros_callback_;
 
     private:
     std::unique_ptr<VoxelMapping> mapper_;
     MapperParams mapper_params_;
+    std::unique_ptr<WaypointFinder> waypointFinder_;
+    WaypointParams waypoint_params_;
     Eigen::Matrix4f map_to_odom_tf_;
     Eigen::Matrix4f cam_transform_;
     Eigen::Vector3f orca_pos_map_frame_;

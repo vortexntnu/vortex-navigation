@@ -20,7 +20,7 @@ void WaypointFinder::initGaussian(){
     }
 }
 
-WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const Params &newParams){
+WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const WaypointParams &newParams){
     params = newParams;
     values = Eigen::MatrixXd::Zero(gridSize(0), gridSize(1));
     obstacles = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>::Zero(gridSize(0), gridSize(1));

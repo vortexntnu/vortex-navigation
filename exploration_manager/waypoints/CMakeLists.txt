@@ -18,13 +18,24 @@ set(SOURCES
 )
 
 # Add the library
-add_library(${PROJECT_NAME} ${SOURCES})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} Eigen3::Eigen)
 
+target_include_directories(waypoints PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+    ${EIGEN3_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
+)
+
 # Install targets
 install(TARGETS ${PROJECT_NAME}
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib)
-install(DIRECTORY include/ DESTINATION include)
+        EXPORT waypoints_export
+        LIBRARY DESTINATION lib)
+
+install(DIRECTORY include/ 
+DESTINATION include)
+
+export(EXPORT waypoints_export FILE "${CMAKE_CURRENT_BINARY_DIR}/waypointsTargets.cmake")

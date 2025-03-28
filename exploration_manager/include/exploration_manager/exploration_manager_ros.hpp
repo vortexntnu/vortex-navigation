@@ -20,6 +20,7 @@
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <visualization_msgs/msg/marker.hpp>
 #include <vortex_msgs/msg/dvl_altitude.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
 
 
 class ExplorationManagerNode : public rclcpp::Node {
@@ -67,6 +68,8 @@ class ExplorationManagerNode : public rclcpp::Node {
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_slice_pub_;
 
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
+
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr waypoint_pub_;
 
     rclcpp::TimerBase::SharedPtr timer_;
 

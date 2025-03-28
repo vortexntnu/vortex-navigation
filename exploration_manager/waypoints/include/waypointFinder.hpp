@@ -5,7 +5,7 @@
 #include <cmath>
 #include <Eigen/Dense> // Include the Eigen library
 
-struct Params{
+struct WaypointParams{
     double sigmaX; //paramters for the 2D gaussian
     double sigmaY;
     int centerX;
@@ -26,7 +26,7 @@ struct Point{
 double distance(const Eigen::Vector2d &p1, const Eigen::Vector2d &p2);
 
 class WaypointFinder {
-    Params params;
+    WaypointParams params;
 
     Eigen::MatrixXd values;    
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> obstacles; // Eigen matrix of obstacle mask
@@ -41,7 +41,7 @@ class WaypointFinder {
 
     public:
         WaypointFinder(){};
-        WaypointFinder(const Eigen::Vector2i gridSize, const Params &newParams);
+        WaypointFinder(const Eigen::Vector2i gridSize, const WaypointParams &newParams);
 
         //subgrid contains data around the drone, 0 is free, 1 is obstacle, -1 is unknown
         //dronePosition is the current drone xy position in meters

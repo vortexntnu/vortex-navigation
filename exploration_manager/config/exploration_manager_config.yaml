@@ -9,6 +9,7 @@
     dvl_altitude_sub_topic: "/dvl/altitude"
     point_cloud_pub_topic: "/voxel_cloud"
     camera_view_visualization_pub_topic: "/camera_view"
+    waypoint_pub_topic: "/exploration_waypoint"
 
     timer_period_ms: 100
 

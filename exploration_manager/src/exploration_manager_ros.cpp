@@ -82,6 +82,11 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     pointcloud_slice_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
         "point_cloud_slice", qos);
 
+    auto waypoint_pub_topic = this->declare_parameter<std::string>("waypoint_pub_topic");
+
+    waypoint_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
+        waypoint_pub_topic, qos);
+
     exploration_manager_.ros_callback_ = std::bind(&ExplorationManagerNode::publish_slice, this, std::placeholders::_1, std::placeholders::_2);
 
 }
@@ -402,6 +407,19 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
     }
 
     pointcloud_slice_pub_->publish(cloud_msg);
+
+    const Eigen::Vector2d waypoint = exploration_manager_.get_waypoint();
+    geometry_msgs::msg::PoseStamped waypoint_msg;
+    waypoint_msg.header.stamp = this->get_clock()->now();
+    waypoint_msg.header.frame_id = map_frame_;
+    waypoint_msg.pose.position.x = waypoint.x();
+    waypoint_msg.pose.position.y = waypoint.y();
+    waypoint_msg.pose.position.z = z_value;
+    waypoint_msg.pose.orientation.w = 1.0;
+    waypoint_msg.pose.orientation.x = 0.0;
+    waypoint_msg.pose.orientation.y = 0.0;
+    waypoint_msg.pose.orientation.z = 0.0;
+    waypoint_pub_->publish(waypoint_msg);
 }
 
 RCLCPP_COMPONENTS_REGISTER_NODE(ExplorationManagerNode)
