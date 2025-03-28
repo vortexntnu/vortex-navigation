@@ -5,6 +5,7 @@ double distance(const Eigen::Vector2d &p1, const Eigen::Vector2d &p2){
     return sqrt(pow(p1(0) - p2(0), 2) + pow(p1(1) - p2(1), 2));
 }
 
+
 double WaypointFinder::tileUtility(const double value, const double distance){
     return value/pow(distance, params.localBias);
 }
@@ -59,7 +60,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f 
                 continue;
             }
 
-            if (distance(Eigen::Vector2d{x, y}, dronePosition) < params.searchRadius){
+            if (distance(Eigen::Vector2d{x, y}, dronePosition.head(2).cast<double>()) < params.searchRadius){
                 values(coordX, coordY) = 0;
             }
         }
@@ -69,7 +70,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f 
     subGrid.transposeInPlace();
 
     //find new waypoint
-    if (distance(waypoint, dronePosition.head(2)) < params.gridSize){
+    if (distance(waypoint.cast<double>(), dronePosition.head(2).cast<double>()) < params.gridSize){
         findWaypoint(dronePosition);
     }
 
@@ -78,7 +79,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXd &subGrid, const Eigen::Vector3f 
 }
 
 
-Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> dilateMask(const Eigen::MatrixXd &inputMask, int dilationSize) {
+Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> dilateMask(const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> &inputMask, int dilationSize) {
     //this is quite stupid, but I don't really want to make the mask a cv::Mat. maybe later
     //covnert to cv::Mat
     cv::Mat mask(inputMask.cols(), inputMask.rows(), CV_8U);
@@ -118,7 +119,7 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
             if (obstaclesWithBuffer(x, y) || unreachableMask(x, y)){
                 continue;
             }
-            double utility = tileUtility(values(x, y), distance(Eigen::Vector2d{x*params.gridSize, y*params.gridSize}, dronePosition));
+            double utility = tileUtility(values(x, y), distance(Eigen::Vector2d{x*params.gridSize, y*params.gridSize}, dronePosition.head(2).cast<double>()));
             if (utility > maxUtility){
                 maxUtility = utility;
                 maxPoint = {x, y};
