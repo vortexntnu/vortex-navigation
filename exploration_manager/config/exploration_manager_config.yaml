@@ -27,11 +27,11 @@
       free_threshold: -3.0
 
     waypoint:
-      sigmaX: 1
-      sigmaY: 1
-      centerX: 5
-      centerY: 0
-      localBias: 1
+      sigmaX: 1.0
+      sigmaY: 1.0
+      centerX: 5.0
+      centerY: 0.0
+      localBias: 1.0
       obstaclesMargin: 5
       searchRadius: 0.5
       gridSize: 0.1
