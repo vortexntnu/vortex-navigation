@@ -27,7 +27,7 @@
       occupancy_threshold: 3.0
       free_threshold: -3.0
 
-    waypoint:
+    waypointFinder:
       sigmaX: 1.0
       sigmaY: 1.0
       centerX: 5.0

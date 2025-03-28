@@ -112,8 +112,8 @@ void ExplorationManagerNode::initialize_mapper_params() {
 }
 void ExplorationManagerNode::initializeWaypointFinderParams() {
     WaypointParams waypointParams;
-    int gridSizeX = this->declare_parameter<int>("voxel_mapping.grid_size_x");
-    int gridSizeY = this->declare_parameter<int>("waypointFinder.grid_size_y");
+    int gridSizeX = this->get_parameter("voxel_mapping.grid_size_x").as_int();
+    int gridSizeY = this->get_parameter("voxel_mapping.grid_size_y").as_int();
 
     waypointParams.resolution = this->declare_parameter<double>("waypointFinder.resolution");
     waypointParams.searchRadius = this->declare_parameter<double>("waypointFinder.searchRadius");
