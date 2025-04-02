@@ -74,6 +74,10 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr waypoint_pub_;
 
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr values_pub_;
+
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr obstacles_pub_;
+
     rclcpp::TimerBase::SharedPtr timer_;
 
     std::string odom_frame_;

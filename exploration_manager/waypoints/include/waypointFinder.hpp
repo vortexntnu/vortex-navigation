@@ -28,11 +28,12 @@ double distance(const Eigen::Vector2d &p1, const Eigen::Vector2d &p2);
 class WaypointFinder {
     WaypointParams params;
 
-    Eigen::MatrixXd values;    
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> values;    
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> obstacles; // Eigen matrix of obstacle mask
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> unreachableMask; // unreachable waypoints. resets every time we update the grid
 
-    Eigen::Vector2i waypoint; //waypoint in grid coordinates
+    Eigen::Vector2i waypoint_; //waypoint in grid coordinates
+    bool waypointSet = false; //if the waypoint is set or not
 
     void initGaussian();
     double tileUtility(const double value, const double distance);
@@ -49,8 +50,14 @@ class WaypointFinder {
 
         void waypointUnreachable(const Eigen::Vector3f &dronePosition);
 
-        Eigen::Vector2d getWaypoint(){
-            return {waypoint(0) * params.resolution, waypoint(1) * params.resolution};
-        };
+        bool getWaypoint(Eigen::Vector2f &waypoint);
+
+        const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>& getObstacles() const {
+            return obstacles;
+        }
+
+        const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>& getValues() const {
+            return values;
+        }
 
 };

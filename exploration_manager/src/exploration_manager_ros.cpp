@@ -89,6 +89,12 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     waypoint_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
         waypoint_pub_topic, qos);
 
+    values_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "values", qos);
+
+    obstacles_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "obstacles", qos);
+
     exploration_manager_.ros_callback_ = std::bind(&ExplorationManagerNode::publish_slice, this, std::placeholders::_1, std::placeholders::_2);
 
 }
@@ -258,6 +264,11 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
 }
 
 void ExplorationManagerNode::timer_callback() {
+    AABB aabb = exploration_manager_.get_last_aabb();
+    Eigen::VectorXi aabb_indices = exploration_manager_.get_aabb_indices(aabb);
+    if (aabb_indices[0] == 0 || aabb_indices[1] == 0 || aabb_indices[2] == 0 || aabb_indices[3] == 0 || aabb_indices[4] == 0 || aabb_indices[5] == 0) {
+        return;
+    }
     exploration_manager_.exploration_timer_callback();
 }
 
@@ -426,7 +437,87 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
 
     pointcloud_slice_pub_->publish(cloud_msg);
 
-    const Eigen::Vector2d waypoint = exploration_manager_.get_waypoint();
+    Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> values = exploration_manager_.get_values();
+
+    sensor_msgs::msg::PointCloud2 values_msg;
+    values_msg.header.stamp = this->get_clock()->now();
+    values_msg.header.frame_id = map_frame_;
+    values_msg.is_dense = false;
+    sensor_msgs::PointCloud2Modifier values_modifier(values_msg);
+    values_modifier.setPointCloud2Fields(
+        4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
+    values_modifier.resize(values.size());
+    sensor_msgs::PointCloud2Iterator<float> iter_values_x(values_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_values_y(values_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_values_z(values_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_values_intensity(values_msg, "intensity");
+    for (int y = 0; y < values.rows(); ++y) {
+        for (int x = 0; x < values.cols(); ++x) {
+            *iter_values_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
+            *iter_values_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
+            *iter_values_z = z_value;
+            *iter_values_intensity = values(y, x);
+            ++iter_values_x;
+            ++iter_values_y;
+            ++iter_values_z;
+            ++iter_values_intensity;
+            
+        }
+    }
+
+    values_pub_->publish(values_msg);
+
+    Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> obstacles = exploration_manager_.get_obstacles();
+    sensor_msgs::msg::PointCloud2 obstacles_msg;
+    obstacles_msg.header.stamp = this->get_clock()->now();
+    obstacles_msg.header.frame_id = map_frame_;
+    obstacles_msg.is_dense = false;
+    sensor_msgs::PointCloud2Modifier obstacles_modifier(obstacles_msg);
+    obstacles_modifier.setPointCloud2Fields(
+        4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
+    obstacles_modifier.resize(obstacles.size());
+    sensor_msgs::PointCloud2Iterator<float> iter_obstacles_x(obstacles_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_obstacles_y(obstacles_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_obstacles_z(obstacles_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_obstacles_intensity(obstacles_msg, "intensity");
+
+    for (int y = 0; y < obstacles.rows(); ++y) {
+        for (int x = 0; x < obstacles.cols(); ++x) {
+            *iter_obstacles_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
+            *iter_obstacles_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
+            *iter_obstacles_z = z_value;
+            if(obstacles(y, x)) {
+                *iter_obstacles_intensity = 100.0;
+            } else {
+                *iter_obstacles_intensity = 0.0;
+            }
+            ++iter_obstacles_x;
+            ++iter_obstacles_y;
+            ++iter_obstacles_z;
+            ++iter_obstacles_intensity;
+        }
+    }
+
+    obstacles_pub_->publish(obstacles_msg);
+
+
+    Eigen::Vector2f waypoint;
+
+    if (!exploration_manager_.get_waypoint(waypoint)) {
+        RCLCPP_WARN(this->get_logger(), "No waypoint found");
+        return;
+    }
+    
     geometry_msgs::msg::PoseStamped waypoint_msg;
     waypoint_msg.header.stamp = this->get_clock()->now();
     waypoint_msg.header.frame_id = map_frame_;

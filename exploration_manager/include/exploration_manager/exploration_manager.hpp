@@ -209,8 +209,16 @@ class ExplorationManager {
 
     void exploration_timer_callback();
 
-    const Eigen::Vector2d get_waypoint() const {
-        return waypointFinder_->getWaypoint();
+    bool get_waypoint(Eigen::Vector2f& waypoint) const {
+        return waypointFinder_->getWaypoint(waypoint);
+    }
+
+    const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>& get_obstacles() const {
+        return waypointFinder_->getObstacles();
+    }
+
+    const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic>& get_values() const {
+        return waypointFinder_->getValues();
     }
 
     std::function<void(const std::vector<float>&, const Eigen::VectorXi&)> ros_callback_;
