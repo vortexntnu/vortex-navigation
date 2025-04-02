@@ -517,13 +517,19 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
         RCLCPP_WARN(this->get_logger(), "No waypoint found");
         return;
     }
+
+    Eigen::Matrix4f map_to_odom = exploration_manager_.get_map_to_odom_tf();
+
+    Eigen::Vector4f waypoint_map(waypoint.x(), waypoint.y(), z_value, 1.0);
+
+    Eigen::Vector4f waypoint_odom = map_to_odom * waypoint_map;
     
     geometry_msgs::msg::PoseStamped waypoint_msg;
     waypoint_msg.header.stamp = this->get_clock()->now();
-    waypoint_msg.header.frame_id = map_frame_;
-    waypoint_msg.pose.position.x = waypoint.x();
-    waypoint_msg.pose.position.y = waypoint.y();
-    waypoint_msg.pose.position.z = z_value;
+    waypoint_msg.header.frame_id = odom_frame_;
+    waypoint_msg.pose.position.x = waypoint_odom.x();
+    waypoint_msg.pose.position.y = waypoint_odom.y();
+    waypoint_msg.pose.position.z = waypoint_odom.z();
     waypoint_msg.pose.orientation.w = 1.0;
     waypoint_msg.pose.orientation.x = 0.0;
     waypoint_msg.pose.orientation.y = 0.0;
