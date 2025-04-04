@@ -109,6 +109,9 @@ void ExplorationManager::exploration_timer_callback() {
     float current_z = T(2, 3);
     slice_indices[4] = std::max(0, static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
     slice_indices[5] = std::min(static_cast<int>(get_mapper_params().size_z - 1), static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
+
+    // slice_indices[4] = slice_indices[4] - 8;
+    // slice_indices[5] = slice_indices[5] + 8;
     
     std::vector<float> slice;
     int radius = 3;
