@@ -20,6 +20,11 @@ void WaypointFinder::initGaussian(){
 
 WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const WaypointParams &newParams){
     params = newParams;
+    params.centerX /= params.resolution;
+    params.centerY /= params.resolution;
+    params.sigmaX /= params.resolution;
+    params.sigmaY /= params.resolution;
+    
     values = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(gridSize(1), gridSize(0));
     obstacles = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(gridSize(1), gridSize(0));
     unreachableMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(gridSize(1), gridSize(0));
@@ -106,7 +111,7 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
         }
     }
     waypointSet = true;
-    waypoint_ = {maxPoint.x, maxPoint.y};
+    waypoint_ = {maxPoint.x*params.resolution, maxPoint.y*params.resolution};
 
     std::cout << "Waypoint: " << waypoint_(0) << ", " << waypoint_(1) << std::endl;
 }
