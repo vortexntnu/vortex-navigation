@@ -518,11 +518,15 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
         return;
     }
 
+    
+
     Eigen::Matrix4f map_to_odom = exploration_manager_.get_map_to_odom_tf();
 
     Eigen::Vector4f waypoint_map(waypoint.x(), waypoint.y(), z_value, 1.0);
 
     Eigen::Vector4f waypoint_odom = map_to_odom * waypoint_map;
+
+    RCLCPP_INFO(this->get_logger(), "Waypoint: x: %.2f, y: %.2f, z: %.2f", waypoint_odom.x(), waypoint_odom.y(), waypoint_odom.z());
     
     geometry_msgs::msg::PoseStamped waypoint_msg;
     waypoint_msg.header.stamp = this->get_clock()->now();
