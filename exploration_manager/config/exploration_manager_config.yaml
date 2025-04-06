@@ -28,13 +28,13 @@
       free_threshold: -3.0
 
     waypointFinder:
-      sigmaX: 1.0
-      sigmaY: 1.0
-      centerX: 5.0
-      centerY: 0.0
+      sigmaX: 2.0
+      sigmaY: 2.0
+      centerX: 55.0
+      centerY: 50.0
       localBias: 1.0
       obstaclesMargin: 5
-      searchRadius: 0.5
+      searchRadius: 2.0
       resolution: 0.1
       unreachableBlacklist: 10
 

@@ -40,6 +40,8 @@ class WaypointFinder {
 
     void findWaypoint(const Eigen::Vector3f &dronePosition);
 
+    Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dilateMask(const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> &inputMask, int dilationSize);
+
     public:
         WaypointFinder(){};
         WaypointFinder(const Eigen::Vector2i gridSize, const WaypointParams &newParams);

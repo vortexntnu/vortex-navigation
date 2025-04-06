@@ -458,8 +458,8 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
     sensor_msgs::PointCloud2Iterator<float> iter_values_intensity(values_msg, "intensity");
     for (int y = 0; y < values.rows(); ++y) {
         for (int x = 0; x < values.cols(); ++x) {
-            *iter_values_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
-            *iter_values_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
+            *iter_values_x = static_cast<float>(x) * voxel_resolution_;
+            *iter_values_y = static_cast<float>(y) * voxel_resolution_;
             *iter_values_z = z_value;
             *iter_values_intensity = values(y, x);
             ++iter_values_x;
@@ -493,8 +493,8 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
 
     for (int y = 0; y < obstacles.rows(); ++y) {
         for (int x = 0; x < obstacles.cols(); ++x) {
-            *iter_obstacles_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
-            *iter_obstacles_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
+            *iter_obstacles_x = static_cast<float>(x) * voxel_resolution_;
+            *iter_obstacles_y = static_cast<float>(y) * voxel_resolution_;
             *iter_obstacles_z = z_value;
             if(obstacles(y, x)) {
                 *iter_obstacles_intensity = 100.0;
@@ -518,9 +518,9 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
         return;
     }
 
-    
 
-    Eigen::Matrix4f map_to_odom = exploration_manager_.get_map_to_odom_tf();
+
+    Eigen::Matrix4f map_to_odom = exploration_manager_.get_map_to_odom_tf().inverse(); //inverse, cause we are actually going from odom to map
 
     Eigen::Vector4f waypoint_map(waypoint.x(), waypoint.y(), z_value, 1.0);
 
@@ -533,7 +533,7 @@ void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, cons
     waypoint_msg.header.frame_id = odom_frame_;
     waypoint_msg.pose.position.x = waypoint_odom.x();
     waypoint_msg.pose.position.y = waypoint_odom.y();
-    waypoint_msg.pose.position.z = waypoint_odom.z();
+    waypoint_msg.pose.position.z = 0;
     waypoint_msg.pose.orientation.w = 1.0;
     waypoint_msg.pose.orientation.x = 0.0;
     waypoint_msg.pose.orientation.y = 0.0;

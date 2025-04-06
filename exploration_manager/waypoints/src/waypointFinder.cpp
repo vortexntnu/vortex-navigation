@@ -5,10 +5,15 @@ double distance(const Eigen::Vector2d &p1, const Eigen::Vector2d &p2){
 }
 
 double WaypointFinder::tileUtility(const double value, const double distance){
-    return value / pow(distance, params.localBias);
+    //TODO: why is the pow noe working????
+    return value;
+    return value / distance; //std::exp(params.localBias*std::log(distance));
+    return 1.0 / pow(distance, params.localBias);
 }
 
 void WaypointFinder::initGaussian(){
+    //add odometry frame to center pos
+
     for (int y = 0; y < values.rows(); y++){
         for (int x = 0; x < values.cols(); x++){
             values(y, x) = exp(-1 * (
@@ -24,7 +29,7 @@ WaypointFinder::WaypointFinder(const Eigen::Vector2i gridSize, const WaypointPar
     params.centerY /= params.resolution;
     params.sigmaX /= params.resolution;
     params.sigmaY /= params.resolution;
-    
+
     values = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(gridSize(1), gridSize(0));
     obstacles = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(gridSize(1), gridSize(0));
     unreachableMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(gridSize(1), gridSize(0));
@@ -46,29 +51,35 @@ void WaypointFinder::updateGrid(Eigen::MatrixXf &subGrid, const Eigen::Vector3f 
         }
     }
 
-    for (int coordY = (dronePosition(1) - params.searchRadius) / params.resolution; coordY < (dronePosition(1) + params.searchRadius) / params.resolution; coordY++){
-        for (int coordX = (dronePosition(0) - params.searchRadius) / params.resolution; coordX < (dronePosition(0) + params.searchRadius) / params.resolution; coordX++){
-            int x = coordX * params.resolution;
-            int y = coordY * params.resolution;
+
+    std::cout << dronePosition(0) << ", " << dronePosition(1) << std::endl;
+
+    for (int coordY = (dronePosition.y() - params.searchRadius) / params.resolution; coordY < (dronePosition.y() + params.searchRadius) / params.resolution; coordY++){
+        for (int coordX = (dronePosition.x() - params.searchRadius) / params.resolution; coordX < (dronePosition.x() + params.searchRadius) / params.resolution; coordX++){
+            double x = coordX * params.resolution;
+            double y = coordY * params.resolution;
 
             if (coordX < 0 || coordX >= values.cols() || coordY < 0 || coordY >= values.rows()){
                 continue;
             }
 
-            if (distance(Eigen::Vector2d{x, y}, dronePosition.head(2).cast<double>()) < params.searchRadius){
+            if (distance(Eigen::Vector2d{x, y}, dronePosition.head(2).cast<double>()) < params.searchRadius || 0){
                 values(coordY, coordX) = 0;
             }
         }
     }
+    
+    Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> obstaclesWithBuffer;
+    obstaclesWithBuffer = dilateMask(obstacles, params.obstaclesMargin);
 
-    if (distance(waypoint_.cast<double>(), dronePosition.head(2).cast<double>()) < params.resolution || !waypointSet){
+    if (distance(waypoint_.cast<double>()*params.resolution, dronePosition.head(2).cast<double>()) < 1 || !waypointSet ||  obstaclesWithBuffer(waypoint_.x(), waypoint_.y())){
         findWaypoint(dronePosition);
     }
 
     unreachableMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(values.rows(), values.cols());
 }
 
-Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> dilateMask(const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> &inputMask, int dilationSize) {
+Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> WaypointFinder::dilateMask(const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> &inputMask, int dilationSize) {
     cv::Mat mask(inputMask.rows(), inputMask.cols(), CV_8U);
     for (int y = 0; y < inputMask.rows(); ++y) {
         for (int x = 0; x < inputMask.cols(); ++x) {
@@ -103,7 +114,8 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
             if (obstaclesWithBuffer(y, x) || unreachableMask(y, x)){
                 continue;
             }
-            double utility = tileUtility(values(y, x), distance(Eigen::Vector2d{x * params.resolution, y * params.resolution}, dronePosition.head(2).cast<double>()));
+
+            double utility = tileUtility(values(y, x), distance(Eigen::Vector2d{y, x}*params.resolution, dronePosition.head(2).cast<double>()));
             if (utility > maxUtility){
                 maxUtility = utility;
                 maxPoint = {x, y};
@@ -111,8 +123,9 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
         }
     }
     waypointSet = true;
-    waypoint_ = {maxPoint.x*params.resolution, maxPoint.y*params.resolution};
-
+    waypoint_ = {maxPoint.x, maxPoint.y};
+    std::cout << maxUtility << std::endl;
+    std::cout << distance(Eigen::Vector2d{0, 0}*params.resolution, dronePosition.head(2).cast<double>()) << std::endl;
     std::cout << "Waypoint: " << waypoint_(0) << ", " << waypoint_(1) << std::endl;
 }
 
@@ -132,7 +145,7 @@ bool WaypointFinder::getWaypoint(Eigen::Vector2f &waypoint){
     if (!waypointSet){
         return false;
     }
-    waypoint(0) = waypoint_(0);
-    waypoint(1) = waypoint_(1);
+    waypoint(0) = waypoint_(0)*params.resolution;
+    waypoint(1) = waypoint_(1)*params.resolution;
     return true;
 };

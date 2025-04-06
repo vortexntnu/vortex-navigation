@@ -126,7 +126,10 @@ void ExplorationManager::exploration_timer_callback() {
 
     Eigen::MatrixXf slice_matrix = slice_matrix_map;
 
-    waypointFinder_->updateGrid(slice_matrix, orca_pos_map_frame_, aabb_indices);
+
+    Eigen::Vector4f orca_pos_map_frame = Eigen::Vector4f(orca_pos_map_frame_(0), orca_pos_map_frame_(1), orca_pos_map_frame_(2), 1.0);
+    auto orca_pose_odom_frame = get_map_to_odom_tf().inverse() * orca_pos_map_frame;
+    waypointFinder_->updateGrid(slice_matrix, orca_pos_map_frame.head(3), aabb_indices);
 
 
     if (ros_callback_) {
