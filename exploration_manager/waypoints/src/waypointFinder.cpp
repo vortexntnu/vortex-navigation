@@ -5,10 +5,7 @@ double distance(const Eigen::Vector2d &p1, const Eigen::Vector2d &p2){
 }
 
 double WaypointFinder::tileUtility(const double value, const double distance){
-    //TODO: why is the pow noe working????
-    return value;
-    return value / distance; //std::exp(params.localBias*std::log(distance));
-    return 1.0 / pow(distance, params.localBias);
+    return value / pow(distance, params.localBias);
 }
 
 void WaypointFinder::initGaussian(){
@@ -115,7 +112,7 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
                 continue;
             }
 
-            double utility = tileUtility(values(y, x), distance(Eigen::Vector2d{y, x}*params.resolution, dronePosition.head(2).cast<double>()));
+            double utility = tileUtility(values(y, x), distance(Eigen::Vector2d{x, y}*params.resolution, dronePosition.head(2).cast<double>()));
             if (utility > maxUtility){
                 maxUtility = utility;
                 maxPoint = {x, y};
@@ -124,9 +121,6 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
     }
     waypointSet = true;
     waypoint_ = {maxPoint.x, maxPoint.y};
-    std::cout << maxUtility << std::endl;
-    std::cout << distance(Eigen::Vector2d{0, 0}*params.resolution, dronePosition.head(2).cast<double>()) << std::endl;
-    std::cout << "Waypoint: " << waypoint_(0) << ", " << waypoint_(1) << std::endl;
 }
 
 void WaypointFinder::waypointUnreachable(const Eigen::Vector3f &dronePosition){

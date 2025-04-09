@@ -5,9 +5,8 @@ using std::placeholders::_1;
 ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& options)
     : Node("exploration_manager_node", options) {
 
+    
     initialize_mapper_params();
-
-    initializeWaypointFinderParams();
 
     this->declare_parameter<bool>("enu_to_ned");
 
@@ -30,6 +29,9 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     Eigen::Affine3f eigen_transform = tf2::transformToEigen(map_to_odom_tf.transform).cast<float>();
 
     exploration_manager_.set_map_to_odom_tf(eigen_transform.matrix());
+
+
+    initializeWaypointFinderParams();
     
     std::chrono::duration<int> buffer_timeout(1);
     
@@ -123,8 +125,17 @@ void ExplorationManagerNode::initializeWaypointFinderParams() {
 
     waypointParams.resolution = this->declare_parameter<double>("waypointFinder.resolution");
     waypointParams.searchRadius = this->declare_parameter<double>("waypointFinder.searchRadius");
-    waypointParams.centerX = this->declare_parameter<double>("waypointFinder.centerX");
-    waypointParams.centerY = this->declare_parameter<double>("waypointFinder.centerY");
+    waypointParams.localBias = this->declare_parameter<double>("waypointFinder.localBias");
+
+    float tmpCenterX = this->declare_parameter<float>("waypointFinder.centerX");
+    float tmpCenterY = this->declare_parameter<float>("waypointFinder.centerY");
+    //transform center to map frame
+    auto transformedCenter = exploration_manager_.get_map_to_odom_tf() * 
+                    Eigen::Vector4f{tmpCenterX, tmpCenterY, 0, 1};
+
+    waypointParams.centerX = transformedCenter.x();
+    waypointParams.centerY = transformedCenter.y();
+
     waypointParams.sigmaX = this->declare_parameter<double>("waypointFinder.sigmaX");
     waypointParams.sigmaY = this->declare_parameter<double>("waypointFinder.sigmaY");
     waypointParams.obstaclesMargin = this->declare_parameter<int>("waypointFinder.obstaclesMargin");

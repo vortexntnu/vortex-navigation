@@ -30,8 +30,8 @@
     waypointFinder:
       sigmaX: 2.0
       sigmaY: 2.0
-      centerX: 55.0
-      centerY: 50.0
+      centerX: 0.0
+      centerY: 5.0
       localBias: 1.0
       obstaclesMargin: 5
       searchRadius: 2.0
