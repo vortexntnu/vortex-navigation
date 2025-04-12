@@ -15,7 +15,7 @@ struct WaypointParams{
     double searchRadius; //radius of what is considered seen around the drone (meters)
     double resolution = 0.1; //size of each grid cell in meters
     int unreachableBlacklist = 20; //how big a buffer around an unreachable waypoint is considered unreachable
-    double orcaBreadth = 1; //how wide the drone is in meters - used to calculate if a waypoint is reachable
+    double orcaBreadth = 0.5; //how wide the drone is in meters - used to calculate if a waypoint is reachable
 };
 
 struct Point{

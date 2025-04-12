@@ -140,6 +140,8 @@ void ExplorationManagerNode::initializeWaypointFinderParams() {
     waypointParams.sigmaY = this->declare_parameter<double>("waypointFinder.sigmaY");
     waypointParams.obstaclesMargin = this->declare_parameter<int>("waypointFinder.obstaclesMargin");
     waypointParams.unreachableBlacklist = this->declare_parameter<int>("waypointFinder.unreachableBlacklist");
+    waypointParams.orcaBreadth = this->declare_parameter<int>("waypointFinder.droneBreadth");
+    
 
     exploration_manager_.initializeWaypointFinder(waypointParams, {gridSizeX, gridSizeY});
 }

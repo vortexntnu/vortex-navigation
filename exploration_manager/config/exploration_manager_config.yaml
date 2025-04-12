@@ -37,4 +37,5 @@
       searchRadius: 2.0
       resolution: 0.1
       unreachableBlacklist: 10
+      droneBreadth: 0.5
 
