@@ -66,14 +66,20 @@ void WaypointFinder::updateGrid(Eigen::MatrixXf &subGrid, const Eigen::Vector3f 
         }
     }
     
+
+    unreachableMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(values.rows(), values.cols());
+
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> obstaclesWithBuffer;
     obstaclesWithBuffer = dilateMask(obstacles, params.obstaclesMargin);
 
     if (distance(waypoint_.cast<double>()*params.resolution, dronePosition.head(2).cast<double>()) < 1 || !waypointSet ||  obstaclesWithBuffer(waypoint_.x(), waypoint_.y())){
         findWaypoint(dronePosition);
-    }
+        while (!aStarAtHome(dronePosition)){
+            waypointUnreachable(dronePosition);
+        }
+        waypointSet = true;
+    }   
 
-    unreachableMask = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>::Zero(values.rows(), values.cols());
 }
 
 Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> WaypointFinder::dilateMask(const Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> &inputMask, int dilationSize) {
@@ -119,7 +125,6 @@ void WaypointFinder::findWaypoint(const Eigen::Vector3f &dronePosition){
             }
         }
     }
-    waypointSet = true;
     waypoint_ = {maxPoint.x, maxPoint.y};
 }
 
@@ -143,3 +148,25 @@ bool WaypointFinder::getWaypoint(Eigen::Vector2f &waypoint){
     waypoint(1) = waypoint_(1)*params.resolution;
     return true;
 };
+
+bool WaypointFinder::aStarAtHome(const Eigen::Vector3f &dronePosition){
+    //we have A* at home. A* at home:
+    //we make a wide line and check if the line intersects with any obstacles
+
+    int minX = std::min(waypoint_(0), static_cast<int>(dronePosition.x() / params.resolution));
+    int maxX = std::max(waypoint_(0), static_cast<int>(dronePosition.x() / params.resolution));
+    int minY = std::min(waypoint_(1), static_cast<int>(dronePosition.y() / params.resolution));
+    int maxY = std::max(waypoint_(1), static_cast<int>(dronePosition.y() / params.resolution));
+
+    int width = maxX - minX;
+    int height = maxY - minY;
+
+    for (int y = minY; y < maxY; y++){
+        for (int x = minX; x < maxX; x++){
+            if (obstacles(y, x) && abs(x*width - y*height) < params.orcaBreadth/params.resolution){
+                return false;
+            }
+        }
+    }
+    return true;
+}
