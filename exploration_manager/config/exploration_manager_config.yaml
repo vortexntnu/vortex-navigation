@@ -36,6 +36,6 @@
       obstaclesMargin: 5
       searchRadius: 2.0
       resolution: 0.1
-      unreachableBlacklist: 10
-      droneBreadth: 0.5
+      unreachableBlacklist: 20
+      droneBreadth: 1.0
 

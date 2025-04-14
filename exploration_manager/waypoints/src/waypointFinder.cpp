@@ -49,6 +49,7 @@ void WaypointFinder::updateGrid(Eigen::MatrixXf &subGrid, const Eigen::Vector3f 
     }
 
 
+
     std::cout << dronePosition(0) << ", " << dronePosition(1) << std::endl;
 
     for (int coordY = (dronePosition.y() - params.searchRadius) / params.resolution; coordY < (dronePosition.y() + params.searchRadius) / params.resolution; coordY++){
@@ -72,10 +73,12 @@ void WaypointFinder::updateGrid(Eigen::MatrixXf &subGrid, const Eigen::Vector3f 
     Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> obstaclesWithBuffer;
     obstaclesWithBuffer = dilateMask(obstacles, params.obstaclesMargin);
 
-    if (distance(waypoint_.cast<double>()*params.resolution, dronePosition.head(2).cast<double>()) < 1 || !waypointSet ||  obstaclesWithBuffer(waypoint_.x(), waypoint_.y())){
+    if (distance(waypoint_.cast<double>()*params.resolution, dronePosition.head(2).cast<double>()) < 1 || !waypointSet ||  obstaclesWithBuffer(waypoint_.y(), waypoint_.x()) || !aStarAtHome(dronePosition)){
+        std::cout << "getting new waypoint ..." << std::endl;   
         findWaypoint(dronePosition);
         while (!aStarAtHome(dronePosition)){
             waypointUnreachable(dronePosition);
+            std::cout << "getting new waypoint ..." << std::endl;  
         }
         waypointSet = true;
     }   
@@ -161,9 +164,18 @@ bool WaypointFinder::aStarAtHome(const Eigen::Vector3f &dronePosition){
     int width = maxX - minX;
     int height = maxY - minY;
 
+    if (0){
+        std::cout << "waypoint: " << waypoint_(0) << ", " << waypoint_(1) << std::endl;
+        std::cout << "drone: " << dronePosition.x() / params.resolution << ", " << dronePosition.y() / params.resolution << std::endl;
+        std::cout << "minX, minY: " << minX << ", " << minY << std::endl;
+        std::cout << "maxX, maxY: " << maxX << ", " << maxY << std::endl;
+        std::cout << "width, height: " << width << ", " << height << std::endl;
+    }
+
+
     for (int y = minY; y < maxY; y++){
         for (int x = minX; x < maxX; x++){
-            if (obstacles(y, x) && abs(x*width - y*height) < params.orcaBreadth/params.resolution){
+            if (obstacles(y, x) &&  abs((x-minX)*height - (y-minY)*width) / std::sqrt(width*width + height*height) < params.orcaBreadth/params.resolution){
                 return false;
             }
         }
