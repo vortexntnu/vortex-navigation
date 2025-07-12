@@ -4,7 +4,6 @@ ExplorationManager::ExplorationManager(/* args */) {
 }
 
 ExplorationManager::~ExplorationManager() {
-    mapper_->~VoxelMapping();
 }
 
 void ExplorationManager::initialize_mapper(MapperParams params) {
@@ -90,15 +89,19 @@ Eigen::VectorXi ExplorationManager::get_aabb_indices(const AABB& aabb) {
 }
 
 void ExplorationManager::process_depth_image(const float* depth_image) {
+    try {
+        Eigen::Matrix4f T = get_cam_transform();
+        AABB aabb = compute_frustum_aabb(T);
+        last_aabb_ = aabb;
+        Eigen::VectorXi aabb_indices = get_aabb_indices(aabb);
 
-    Eigen::Matrix4f T = get_cam_transform();
-    AABB aabb = compute_frustum_aabb(T);
-    last_aabb_ = aabb;
-    Eigen::VectorXi aabb_indices = get_aabb_indices(aabb);
+        mapper_->integrate_depth(depth_image, T, aabb_indices);
 
-    mapper_->integrate_depth(depth_image, T, aabb_indices);
-
-    updated_block_ = mapper_->get_grid_block(aabb_indices);
+        updated_block_ = mapper_->get_grid_block(aabb_indices);
+    } catch (const std::exception& e) {
+        std::cerr << "Error during depth processing: " << e.what() << std::endl;
+        // TODO: destroy and reinitialize mapper_??
+    }
 }
 
 void ExplorationManager::exploration_timer_callback() {
@@ -110,9 +113,7 @@ void ExplorationManager::exploration_timer_callback() {
     slice_indices[4] = std::max(0, static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
     slice_indices[5] = std::min(static_cast<int>(get_mapper_params().size_z - 1), static_cast<int>(std::floor(current_z / get_mapper_params().resolution)));
 
-    // slice_indices[4] = slice_indices[4] - 8;
-    // slice_indices[5] = slice_indices[5] + 8;
-    
+
     std::vector<float> slice;
     int radius = 3;
     // mapper_->extract_slice(slice_indices, slice);

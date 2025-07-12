@@ -18,9 +18,7 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(vortex_msgs REQUIRED)
-
-# Add subdirectory for the Grid module (handles its own CUDA setup)
-add_subdirectory(voxel_mapping)
+find_package(voxel_mapping REQUIRED)
 
 include_directories(include)
 
@@ -31,8 +29,7 @@ add_library(${LIB_NAME} SHARED
   src/exploration_manager.cpp
 )
 
-# Link against the voxel_mapping CUDA library
-target_link_libraries(${LIB_NAME} PUBLIC voxel_mapping_cuda)
+target_link_libraries(${LIB_NAME} PUBLIC voxel_mapping::voxel_mapping)
 
 target_include_directories(${LIB_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -52,6 +49,7 @@ ament_target_dependencies(${LIB_NAME} PUBLIC
   tf2_eigen
   visualization_msgs
   vortex_msgs
+  voxel_mapping
 )
 
 rclcpp_components_register_node(
@@ -62,7 +60,7 @@ rclcpp_components_register_node(
 
 ament_export_targets(export_${LIB_NAME} HAS_LIBRARY_TARGET)
 install(
-  TARGETS ${LIB_NAME} voxel_mapping_cuda
+  TARGETS ${LIB_NAME}
   EXPORT export_${LIB_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
