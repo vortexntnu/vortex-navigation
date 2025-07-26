@@ -18,6 +18,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <visualization_msgs/msg/marker.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
 struct MapperParams {
     size_t chunk_capacity;
@@ -44,11 +45,15 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     void camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg);
 
+    void odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
+
     void publish_aabb_marker(const voxel_mapping::AABB& aabb);
 
     void publish_frustum_marker(const voxel_mapping::Frustum& frustum);
 
-    void publish_3d_chunk(const std::vector<int>& chunk, voxel_mapping::AABB aabb);
+    void publish_3d_chunk(const std::vector<int>& chunk, const voxel_mapping::AABB& aabb);
+
+    void publish_esdf_slice(const std::vector<int>& esdf_slice, const voxel_mapping::AABB& aabb);
 
     geometry_msgs::msg::TransformStamped compute_map_odom_transform();
 
@@ -62,11 +67,11 @@ class ExplorationManagerNode : public rclcpp::Node {
    std::shared_ptr<tf2_ros::MessageFilter<sensor_msgs::msg::Image>> depth_filter_;
    
    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
+
+   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
    
    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_pub_;
-   
-   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_slice_pub_;
-   
+      
    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_esdf_pub_;
    
    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
@@ -77,6 +82,7 @@ class ExplorationManagerNode : public rclcpp::Node {
     std::string odom_frame_;
     std::string map_frame_;
     std::string optical_frame_;
+    float orca_z_pos_ = 0.0f;
 
     std::unique_ptr<voxel_mapping::VoxelMapping> mapper_;
     MapperParams mapper_params_;

@@ -59,6 +59,11 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
         camera_info_sub_topic, qos,
         std::bind(&ExplorationManagerNode::camera_info_callback, this, _1));
 
+    std::string odom_sub_topic = this->declare_parameter<std::string>("odom_sub_topic");
+    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        odom_sub_topic, qos,
+        std::bind(&ExplorationManagerNode::odometry_callback, this, _1));
+
     auto point_cloud_pub_topic = this->declare_parameter<std::string>("voxelcloud_pub_topic");
     
     point_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
@@ -74,11 +79,8 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
         std::chrono::milliseconds(timer_period_ms),
         std::bind(&ExplorationManagerNode::timer_callback, this));
 
-    // pointcloud_slice_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    //     "point_cloud_slice", qos);
-
-    // pointcloud_esdf_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-    //     "point_cloud_esdf", qos);
+    pointcloud_esdf_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+        "point_cloud_esdf", qos);
 }
 
 void ExplorationManagerNode::initialize_mapper_params() {
@@ -127,6 +129,10 @@ geometry_msgs::msg::TransformStamped ExplorationManagerNode::compute_map_odom_tr
 
     return map_to_odom;
 }
+
+void ExplorationManagerNode::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+    orca_z_pos_ = -msg->pose.pose.position.z;
+}
        
 void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image::ConstSharedPtr msg) {
     if (!camera_info_received_) {
@@ -164,7 +170,7 @@ void ExplorationManagerNode::timer_callback() {
         return;
     }
     voxel_mapping::AABB aabb = last_aabb_;
-
+    
     if (aabb.size.x == 0 || aabb.size.y == 0 || aabb.size.z == 0) {
         spdlog::warn("AABB size is zero, skipping processing.");
         return;
@@ -176,15 +182,33 @@ void ExplorationManagerNode::timer_callback() {
         spdlog::error("Error getting 3D block: {}", e.what());
         return;
     }
-
+    
     if (chunk.empty()) {
         spdlog::warn("No data available for the AABB, skipping publishing.");
         return;
     }
     publish_3d_chunk(chunk, aabb);
+    
+    voxel_mapping::AABB aabb_slice = aabb;
+    aabb_slice.min_corner_index.z = static_cast<int>(std::floor(orca_z_pos_ / mapper_params_.resolution));
+    aabb_slice.size.z = 1; // Extracting a single slice in the z dimension
+
+    std::vector<int> esdf_slice;
+    try {
+        mapper_->extract_esdf_slice(aabb_slice, esdf_slice);
+    } catch (const std::exception &e) {
+        spdlog::error("Error extracting ESDF slice: {}", e.what());
+        return;
+    }
+    if (esdf_slice.empty()) {
+        spdlog::warn("ESDF slice is empty, skipping publishing.");
+        return;
+    }
+    publish_esdf_slice(esdf_slice, aabb_slice);
+
 }
 
-void ExplorationManagerNode::publish_3d_chunk(const std::vector<int>& chunk, voxel_mapping::AABB aabb) {
+void ExplorationManagerNode::publish_3d_chunk(const std::vector<int>& chunk, const voxel_mapping::AABB& aabb) {
     struct Point {
         float x, y, z, intensity;
     };
@@ -250,6 +274,55 @@ void ExplorationManagerNode::publish_3d_chunk(const std::vector<int>& chunk, vox
     }
 
     point_cloud_pub_->publish(cloud_msg);
+}
+
+void ExplorationManagerNode::publish_esdf_slice(const std::vector<int>& esdf_slice, const voxel_mapping::AABB& aabb) {
+    if (esdf_slice.empty()) {
+        spdlog::warn("ESDF slice is empty, skipping publishing.");
+        return;
+    }
+
+    sensor_msgs::msg::PointCloud2 esdf_msg;
+    esdf_msg.header.stamp = this->get_clock()->now();
+    esdf_msg.header.frame_id = map_frame_;
+    esdf_msg.is_dense = true;
+
+    sensor_msgs::PointCloud2Modifier modifier(esdf_msg);
+    modifier.setPointCloud2Fields(
+        4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
+
+    size_t total_points = esdf_slice.size();
+    modifier.resize(total_points);
+
+    sensor_msgs::PointCloud2Iterator<float> iter_x(esdf_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(esdf_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(esdf_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(esdf_msg, "intensity");
+
+    float resolution = mapper_params_.resolution;
+    int size_x = aabb.size.x;
+    int size_y = aabb.size.y;
+
+    for (int y = 0; y < size_y; ++y) {
+        for (int x = 0; x < size_x; ++x) {
+            int idx = y * size_x + x;
+            if (idx < total_points) {
+                int value = esdf_slice[idx];
+                *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
+                *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
+                *iter_z = static_cast<float>(aabb.min_corner_index.z) * resolution;
+                *iter_intensity = static_cast<float>(value);
+                ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
+            }
+        }
+    }
+
+    pointcloud_esdf_pub_->publish(esdf_msg);
 }
 
 void ExplorationManagerNode::publish_aabb_marker(const voxel_mapping::AABB& aabb) {

@@ -6,6 +6,7 @@
     optical_frame: "Orca/Dcam"
     depth_image_sub_topic: "/depth_cam/image_depth"
     camera_info_sub_topic: "/depth_cam/camera_info"
+    odom_sub_topic: "/orca/odom"
     voxelcloud_pub_topic: "/voxel_cloud"
     camera_view_visualization_pub_topic: "/camera_view"
 
