@@ -17,8 +17,9 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(visualization_msgs REQUIRED)
-find_package(vortex_msgs REQUIRED)
 find_package(voxel_mapping REQUIRED)
+find_package(spdlog REQUIRED)
+find_package(fmt REQUIRED)
 
 include_directories(include)
 
@@ -26,10 +27,12 @@ set(LIB_NAME "${PROJECT_NAME}_component")
 
 add_library(${LIB_NAME} SHARED
   src/exploration_manager_ros.cpp
-  src/exploration_manager.cpp
 )
 
-target_link_libraries(${LIB_NAME} PUBLIC voxel_mapping::voxel_mapping)
+target_link_libraries(${LIB_NAME} PUBLIC voxel_mapping::voxel_mapping
+  spdlog::spdlog
+  fmt::fmt
+)
 
 target_include_directories(${LIB_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -48,7 +51,6 @@ ament_target_dependencies(${LIB_NAME} PUBLIC
   message_filters
   tf2_eigen
   visualization_msgs
-  vortex_msgs
   voxel_mapping
 )
 

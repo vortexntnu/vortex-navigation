@@ -6,23 +6,20 @@
     optical_frame: "Orca/Dcam"
     depth_image_sub_topic: "/depth_cam/image_depth"
     camera_info_sub_topic: "/depth_cam/camera_info"
-    dvl_altitude_sub_topic: "/dvl/altitude"
-    point_cloud_pub_topic: "/voxel_cloud"
+    voxelcloud_pub_topic: "/voxel_cloud"
     camera_view_visualization_pub_topic: "/camera_view"
 
     timer_period_ms: 100
 
     voxel_mapping:
+      chunk_capacity: 1000
       grid_resolution: 0.1
-      grid_size_x: 1000
-      grid_size_y: 1000
-      grid_size_z: 100
       min_depth: 0.3
       max_depth: 5.0
-      log_odds_occupied_update: 1.0
-      log_odds_free_update: -1.0
-      log_odds_min: -6.0
-      log_odds_max: 6.0
-      occupancy_threshold: 3.0
-      free_threshold: -3.0
+      log_odds_occupied_update: 1
+      log_odds_free_update: -1
+      log_odds_min: -6
+      log_odds_max: 6
+      occupancy_threshold: 3
+      free_threshold: -3
 

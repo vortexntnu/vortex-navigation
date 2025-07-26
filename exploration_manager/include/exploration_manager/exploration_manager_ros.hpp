@@ -1,8 +1,7 @@
 #ifndef EXPLORATION_MANAGER_ROS_HPP
 #define EXPLORATION_MANAGER_ROS_HPP
 
-#include <exploration_manager/exploration_manager.hpp>
-
+#include "voxel-mapping/voxel_mapping.hpp"
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
@@ -19,8 +18,19 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <visualization_msgs/msg/marker.hpp>
-#include <vortex_msgs/msg/dvl_altitude.hpp>
 
+struct MapperParams {
+    size_t chunk_capacity;
+    float resolution;
+    float min_depth;
+    float max_depth;
+    int log_odds_occupied;
+    int log_odds_free;
+    int log_odds_min;
+    int log_odds_max;
+    int occupancy_threshold;
+    int free_threshold;
+};
 
 class ExplorationManagerNode : public rclcpp::Node {
    public:
@@ -34,49 +44,46 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     void camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg);
 
-    void dvl_altitude_callback(const vortex_msgs::msg::DVLAltitude::SharedPtr msg);
+    void publish_aabb_marker(const voxel_mapping::AABB& aabb);
 
-    void publish_aabb_marker(const AABB& aabb);
+    void publish_frustum_marker(const voxel_mapping::Frustum& frustum);
 
-    void publish_frustum_marker(const Eigen::Matrix4f& T);
+    void publish_3d_chunk(const std::vector<int>& chunk, voxel_mapping::AABB aabb);
 
     geometry_msgs::msg::TransformStamped compute_map_odom_transform();
 
     void timer_callback();
 
-    void publish_slice(const std::vector<float>& slice, const Eigen::VectorXi& aabb_indices);
-
-    void publish_esdf(const std::vector<float>& esdf, const Eigen::VectorXi& aabb_indices);
-
    private:
-
-    ExplorationManager exploration_manager_;
-
-    bool camera_info_received_ = false;
-
-    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-    std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_broadcaster_;
-    message_filters::Subscriber<sensor_msgs::msg::Image> depth_sub_;
-    std::shared_ptr<tf2_ros::MessageFilter<sensor_msgs::msg::Image>> depth_filter_;
-
-    rclcpp::Subscription<vortex_msgs::msg::DVLAltitude>::SharedPtr dvl_altitude_sub_;
-
-    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
-
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_pub_;
-
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_slice_pub_;
-
-    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_esdf_pub_;
-
-    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
-
-    rclcpp::TimerBase::SharedPtr timer_;
-
+   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+   std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_broadcaster_;
+   message_filters::Subscriber<sensor_msgs::msg::Image> depth_sub_;
+   std::shared_ptr<tf2_ros::MessageFilter<sensor_msgs::msg::Image>> depth_filter_;
+   
+   rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
+   
+   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_pub_;
+   
+   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_slice_pub_;
+   
+   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_esdf_pub_;
+   
+   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
+   
+   rclcpp::TimerBase::SharedPtr timer_;
+   
+   bool camera_info_received_ = false;
     std::string odom_frame_;
     std::string map_frame_;
     std::string optical_frame_;
+
+    std::unique_ptr<voxel_mapping::VoxelMapping> mapper_;
+    MapperParams mapper_params_;
+    voxel_mapping::AABB last_aabb_;
+
+    Eigen::Matrix4f map_to_odom_tf_;
+    Eigen::Matrix4f cam_transform_;
 
 };
 

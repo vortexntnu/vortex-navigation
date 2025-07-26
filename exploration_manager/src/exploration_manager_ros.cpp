@@ -1,4 +1,5 @@
 #include <exploration_manager/exploration_manager_ros.hpp>
+#include <spdlog/spdlog.h>
 
 using std::placeholders::_1;
 
@@ -27,8 +28,8 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
 
     Eigen::Affine3f eigen_transform = tf2::transformToEigen(map_to_odom_tf.transform).cast<float>();
 
-    exploration_manager_.set_map_to_odom_tf(eigen_transform.matrix());
-    
+    map_to_odom_tf_ = eigen_transform.matrix();
+
     std::chrono::duration<int> buffer_timeout(1);
     
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
@@ -58,16 +59,10 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
         camera_info_sub_topic, qos,
         std::bind(&ExplorationManagerNode::camera_info_callback, this, _1));
 
-    auto dvl_altitude_sub_topic = this->declare_parameter<std::string>("dvl_altitude_sub_topic");
-
-    dvl_altitude_sub_ = this->create_subscription<vortex_msgs::msg::DVLAltitude>(
-        dvl_altitude_sub_topic, qos,
-        std::bind(&ExplorationManagerNode::dvl_altitude_callback, this, _1));
-
-    auto point_cloud_pub_topic = this->declare_parameter<std::string>("point_cloud_pub_topic");
+    auto point_cloud_pub_topic = this->declare_parameter<std::string>("voxelcloud_pub_topic");
     
     point_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-        point_cloud_pub_topic, qos);
+        point_cloud_pub_topic, 10);
 
     auto marker_pub_topic = this->declare_parameter<std::string>("camera_view_visualization_pub_topic");
 
@@ -79,34 +74,29 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
         std::chrono::milliseconds(timer_period_ms),
         std::bind(&ExplorationManagerNode::timer_callback, this));
 
-    pointcloud_slice_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-        "point_cloud_slice", qos);
+    // pointcloud_slice_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+    //     "point_cloud_slice", qos);
 
-    pointcloud_esdf_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-        "point_cloud_esdf", qos);
-
-    exploration_manager_.ros_callback_ = std::bind(&ExplorationManagerNode::publish_slice, this, std::placeholders::_1, std::placeholders::_2);
-
-    exploration_manager_.esdf_callback_ = std::bind(&ExplorationManagerNode::publish_esdf, this, std::placeholders::_1, std::placeholders::_2);
-
+    // pointcloud_esdf_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
+    //     "point_cloud_esdf", qos);
 }
 
 void ExplorationManagerNode::initialize_mapper_params() {
     MapperParams mapper_params;
+    mapper_params.chunk_capacity = this->declare_parameter<int>("voxel_mapping.chunk_capacity");
     mapper_params.resolution = this->declare_parameter<double>("voxel_mapping.grid_resolution");
-    mapper_params.size_x = this->declare_parameter<int>("voxel_mapping.grid_size_x");
-    mapper_params.size_y = this->declare_parameter<int>("voxel_mapping.grid_size_y");
-    mapper_params.size_z = this->declare_parameter<int>("voxel_mapping.grid_size_z");
     mapper_params.min_depth = this->declare_parameter<double>("voxel_mapping.min_depth");
     mapper_params.max_depth = this->declare_parameter<double>("voxel_mapping.max_depth");
-    mapper_params.log_odds_occupied = this->declare_parameter<double>("voxel_mapping.log_odds_occupied_update");
-    mapper_params.log_odds_free = this->declare_parameter<double>("voxel_mapping.log_odds_free_update");
-    mapper_params.log_odds_min = this->declare_parameter<double>("voxel_mapping.log_odds_min");
-    mapper_params.log_odds_max = this->declare_parameter<double>("voxel_mapping.log_odds_max");
-    mapper_params.occupancy_threshold = this->declare_parameter<double>("voxel_mapping.occupancy_threshold");
-    mapper_params.free_threshold = this->declare_parameter<double>("voxel_mapping.free_threshold");
-    
-    exploration_manager_.initialize_mapper(mapper_params);
+    mapper_params.log_odds_occupied = this->declare_parameter<int>("voxel_mapping.log_odds_occupied_update");
+    mapper_params.log_odds_free = this->declare_parameter<int>("voxel_mapping.log_odds_free_update");
+    mapper_params.log_odds_min = this->declare_parameter<int>("voxel_mapping.log_odds_min");
+    mapper_params.log_odds_max = this->declare_parameter<int>("voxel_mapping.log_odds_max");
+    mapper_params.occupancy_threshold = this->declare_parameter<int>("voxel_mapping.occupancy_threshold");
+    mapper_params.free_threshold = this->declare_parameter<int>("voxel_mapping.free_threshold");
+
+    mapper_params_ = mapper_params;
+
+    mapper_ = std::make_unique<voxel_mapping::VoxelMapping>(mapper_params_.chunk_capacity, mapper_params_.resolution, mapper_params_.min_depth, mapper_params_.max_depth, mapper_params_.log_odds_occupied, mapper_params_.log_odds_free, mapper_params_.log_odds_min, mapper_params_.log_odds_max, mapper_params_.occupancy_threshold, mapper_params_.free_threshold);
 }
 
 geometry_msgs::msg::TransformStamped ExplorationManagerNode::compute_map_odom_transform() {
@@ -115,19 +105,10 @@ geometry_msgs::msg::TransformStamped ExplorationManagerNode::compute_map_odom_tr
     map_to_odom.header.frame_id = map_frame_;
     map_to_odom.child_frame_id = odom_frame_;
 
-    int size_x = this->get_parameter("voxel_mapping.grid_size_x").as_int();
-    int size_y = this->get_parameter("voxel_mapping.grid_size_y").as_int();
-    int size_z = this->get_parameter("voxel_mapping.grid_size_z").as_int();
-    float resolution = this->get_parameter("voxel_mapping.grid_resolution").as_double();
+    map_to_odom.transform.translation.x = 0.0;
+    map_to_odom.transform.translation.y = 0.0;
+    map_to_odom.transform.translation.z = 0.0;
 
-    float center_x = static_cast<float>((size_x - 1) / 2.0) * resolution;
-    float center_y = static_cast<float>((size_y - 1) / 2.0) * resolution;
-    float center_z = static_cast<float>((size_z - 1) / 2.0) * resolution;
-
-    map_to_odom.transform.translation.x = center_x;
-    map_to_odom.transform.translation.y = center_y;
-    map_to_odom.transform.translation.z = center_z;
-    
     if (this->get_parameter("enu_to_ned").as_bool()) {
         tf2::Quaternion q1;
         q1.setRPY(M_PI, 0.0, M_PI_2);
@@ -155,46 +136,93 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
     try {
         transform = tf_buffer_->lookupTransform(map_frame_, optical_frame_, msg->header.stamp);
     } catch (tf2::TransformException &ex) {
-        RCLCPP_WARN(this->get_logger(), "Could not transform depth image: %s", ex.what());
+        spdlog::warn("Could not transform depth image: {}", ex.what());
         return;
     }
     Eigen::Affine3f eigen_transform = tf2::transformToEigen(transform.transform).cast<float>();
     Eigen::Matrix4f T = eigen_transform.matrix();
 
-    exploration_manager_.set_cam_pos_map_frame(Eigen::Vector3f(transform.transform.translation.x,
-                                                              transform.transform.translation.y,
-                                                              transform.transform.translation.z));
-                                                              exploration_manager_.set_cam_transform(T);
-       
-    exploration_manager_.process_depth_image(reinterpret_cast<const float*>(msg->data.data()));
+    cam_transform_ = T;
 
-    AABB aabb = exploration_manager_.get_last_aabb();
-    publish_aabb_marker(aabb);
-    publish_frustum_marker(T);
-    
-    Eigen::VectorXi aabb_indices = exploration_manager_.get_aabb_indices(aabb);
+    try {
+        const float* tf_ptr = reinterpret_cast<const float*>(T.data());
+        const float* depth_ptr = reinterpret_cast<const float*>(msg->data.data());
+        mapper_->integrate_depth(depth_ptr, tf_ptr);
+    } catch (const std::exception &e) {
+        spdlog::error("Error integrating depth image: {}", e.what());
+    }
 
-    std::vector<float> block = exploration_manager_.get_updated_block();
+    last_aabb_ = mapper_->get_current_aabb();
+    publish_aabb_marker(last_aabb_);
+    voxel_mapping::Frustum frustum = mapper_->get_frustum();
+    publish_frustum_marker(frustum);
 
-    float grid_resolution = this->get_parameter("voxel_mapping.grid_resolution").as_double();
-    int grid_size_x = this->get_parameter("voxel_mapping.grid_size_x").as_int();
-    int grid_size_y = this->get_parameter("voxel_mapping.grid_size_y").as_int();
-    int grid_size_z = this->get_parameter("voxel_mapping.grid_size_z").as_int();
+}
 
-    int aabb_min_x = aabb_indices[0];
-    int aabb_max_x = aabb_indices[1];
-    int aabb_min_y = aabb_indices[2];
-    int aabb_max_y = aabb_indices[3];
-    int aabb_min_z = aabb_indices[4];
-    int aabb_max_z = aabb_indices[5];
-    size_t aabb_size_x = aabb_max_x - aabb_min_x + 1;
-    size_t aabb_size_y = aabb_max_y - aabb_min_y + 1;
-    size_t aabb_size_z = aabb_max_z - aabb_min_z + 1;
+void ExplorationManagerNode::timer_callback() {
+    if (!camera_info_received_) {
+        return;
+    }
+    voxel_mapping::AABB aabb = last_aabb_;
+
+    if (aabb.size.x == 0 || aabb.size.y == 0 || aabb.size.z == 0) {
+        spdlog::warn("AABB size is zero, skipping processing.");
+        return;
+    }
+    std::vector<int> chunk;
+    try {
+        chunk = mapper_->get_3d_block(aabb);
+    } catch (const std::exception &e) {
+        spdlog::error("Error getting 3D block: {}", e.what());
+        return;
+    }
+
+    if (chunk.empty()) {
+        spdlog::warn("No data available for the AABB, skipping publishing.");
+        return;
+    }
+    publish_3d_chunk(chunk, aabb);
+}
+
+void ExplorationManagerNode::publish_3d_chunk(const std::vector<int>& chunk, voxel_mapping::AABB aabb) {
+    struct Point {
+        float x, y, z, intensity;
+    };
+    std::vector<Point> points_to_publish;
+
+    int aabb_min_x = aabb.min_corner_index.x;
+    int aabb_min_y = aabb.min_corner_index.y;
+    int aabb_min_z = aabb.min_corner_index.z;
+    int aabb_size_x = aabb.size.x;
+    int aabb_size_y = aabb.size.y;
+    int aabb_size_z = aabb.size.z;
+
+    double grid_resolution = mapper_params_.resolution;
+    int occupancy_threshold = mapper_params_.occupancy_threshold;
+
+    for (int z = 0; z < aabb_size_z; ++z) {
+        for (int y = 0; y < aabb_size_y; ++y) {
+            for (int x = 0; x < aabb_size_x; ++x) {
+                size_t idx = z * (aabb_size_x * aabb_size_y) + y * aabb_size_x + x;
+                if (idx < chunk.size()) {
+                    int value = chunk[idx];
+                    if (value > occupancy_threshold) {
+                        Point p;
+                        p.x = static_cast<float>(x + aabb_min_x) * grid_resolution;
+                        p.y = static_cast<float>(y + aabb_min_y) * grid_resolution;
+                        p.z = static_cast<float>(z + aabb_min_z) * grid_resolution;
+                        p.intensity = static_cast<float>(value);
+                        points_to_publish.push_back(p);
+                    }
+                }
+            }
+        }
+    }
 
     sensor_msgs::msg::PointCloud2 cloud_msg;
     cloud_msg.header.stamp = this->get_clock()->now();
     cloud_msg.header.frame_id = map_frame_;
-    cloud_msg.is_dense = false;
+    cloud_msg.is_dense = true;
 
     sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
     modifier.setPointCloud2Fields(
@@ -205,50 +233,26 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
         "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
     );
 
-    modifier.resize(aabb_size_x * aabb_size_y * aabb_size_z);
+    modifier.resize(points_to_publish.size());
+
     sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
     sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
     sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
     sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
 
-    size_t point_count = 0;
-    for (size_t y = 0; y < aabb_size_y; ++y) {
-        for (size_t x = 0; x < aabb_size_x; ++x) {
-            for (size_t z = 0; z < aabb_size_z; ++z) {
-                // Z-major index: y * (size_x * size_z) + x * size_z + z
-                size_t idx = y * (aabb_size_x * aabb_size_z) + x * aabb_size_z + z;
-                if (idx < block.size()) {
-                    float value = block[idx];
-                    if (value > this->get_parameter("voxel_mapping.occupancy_threshold").as_double()) {
-                        *iter_x = static_cast<float>(aabb_min_x + x) * grid_resolution;
-                        *iter_y = static_cast<float>(aabb_min_y + y) * grid_resolution;
-                        *iter_z = static_cast<float>(aabb_min_z + z) * grid_resolution;
-                        *iter_intensity = value;
-                        ++iter_x;
-                        ++iter_y;
-                        ++iter_z;
-                        ++iter_intensity;
-                        ++point_count;
-                    }
-                }
-            }
-        }
+    for (const auto& point : points_to_publish) {
+        *iter_x = point.x;
+        *iter_y = point.y;
+        *iter_z = point.z;
+        *iter_intensity = point.intensity;
+
+        ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
     }
 
-    modifier.resize(point_count);
     point_cloud_pub_->publish(cloud_msg);
 }
 
-void ExplorationManagerNode::timer_callback() {
-    AABB aabb = exploration_manager_.get_last_aabb();
-    Eigen::VectorXi aabb_indices = exploration_manager_.get_aabb_indices(aabb);
-    if (aabb_indices[0] == 0 || aabb_indices[1] == 0 || aabb_indices[2] == 0 || aabb_indices[3] == 0) {
-        return;
-    }
-    exploration_manager_.exploration_timer_callback();
-}
-
-void ExplorationManagerNode::publish_aabb_marker(const AABB& aabb) {
+void ExplorationManagerNode::publish_aabb_marker(const voxel_mapping::AABB& aabb) {
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = map_frame_;
     marker.header.stamp = this->get_clock()->now();
@@ -257,21 +261,31 @@ void ExplorationManagerNode::publish_aabb_marker(const AABB& aabb) {
     marker.type = visualization_msgs::msg::Marker::CUBE;
     marker.action = visualization_msgs::msg::Marker::ADD;
 
-    Eigen::Vector3f center = (aabb.min_corner + aabb.max_corner) / 2.0f;
-    Eigen::Vector3f dimensions = aabb.max_corner - aabb.min_corner;
+    float resolution = mapper_params_.resolution;
+
+    Eigen::Vector3f min_corner_world(
+        aabb.min_corner_index.x * resolution,
+        aabb.min_corner_index.y * resolution,
+        aabb.min_corner_index.z * resolution
+    );
+
+    Eigen::Vector3f dimensions_world(
+        aabb.size.x * resolution,
+        aabb.size.y * resolution,
+        aabb.size.z * resolution
+    );
+
+    Eigen::Vector3f center = min_corner_world + (dimensions_world / 2.0f);
 
     marker.pose.position.x = center.x();
     marker.pose.position.y = center.y();
     marker.pose.position.z = center.z();
 
     marker.pose.orientation.w = 1.0;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
 
-    marker.scale.x = dimensions.x();
-    marker.scale.y = dimensions.y();
-    marker.scale.z = dimensions.z();
+    marker.scale.x = dimensions_world.x();
+    marker.scale.y = dimensions_world.y();
+    marker.scale.z = dimensions_world.z();
 
     marker.color.r = 0.0;
     marker.color.g = 0.0;
@@ -283,7 +297,7 @@ void ExplorationManagerNode::publish_aabb_marker(const AABB& aabb) {
     marker_pub_->publish(marker);
 }
 
-void ExplorationManagerNode::publish_frustum_marker(const Eigen::Matrix4f& T) {
+void ExplorationManagerNode::publish_frustum_marker(const voxel_mapping::Frustum& frustum) {
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = map_frame_;
     marker.header.stamp = this->get_clock()->now();
@@ -301,165 +315,64 @@ void ExplorationManagerNode::publish_frustum_marker(const Eigen::Matrix4f& T) {
 
     marker.lifetime = rclcpp::Duration::from_seconds(1.0);
 
-    std::vector<Eigen::Vector4f> frustum_corners = exploration_manager_.compute_frustum_corners();
+    std::vector<voxel_mapping::Vec3f> corners;
+    corners.reserve(8);
 
-    std::vector<Eigen::Vector3f> transformed_corners;
-    for (const auto& corner : frustum_corners) {
-        Eigen::Vector4f transformed = T * corner;
-        transformed_corners.push_back(transformed.head<3>() / transformed.w());
-    }
+    // Near plane corners (indices 0-3)
+    corners.push_back(frustum.near_plane.bl);
+    corners.push_back(frustum.near_plane.br);
+    corners.push_back(frustum.near_plane.tr);
+    corners.push_back(frustum.near_plane.tl);
 
-    auto add_line = [&marker](const Eigen::Vector3f& p1, const Eigen::Vector3f& p2) {
+    // Far plane corners (indices 4-7)
+    corners.push_back(frustum.far_plane.bl);
+    corners.push_back(frustum.far_plane.br);
+    corners.push_back(frustum.far_plane.tr);
+    corners.push_back(frustum.far_plane.tl);
+
+    auto add_line = [&marker](const voxel_mapping::Vec3f& p1, const voxel_mapping::Vec3f& p2) {
         geometry_msgs::msg::Point point1, point2;
-        point1.x = p1.x(); point1.y = p1.y(); point1.z = p1.z();
-        point2.x = p2.x(); point2.y = p2.y(); point2.z = p2.z();
+        point1.x = p1.x; point1.y = p1.y; point1.z = p1.z;
+        point2.x = p2.x; point2.y = p2.y; point2.z = p2.z;
         marker.points.push_back(point1);
         marker.points.push_back(point2);
     };
 
-    add_line(transformed_corners[0], transformed_corners[1]);
-    add_line(transformed_corners[1], transformed_corners[2]);
-    add_line(transformed_corners[2], transformed_corners[3]);
-    add_line(transformed_corners[3], transformed_corners[0]);
+    // Draw near plane
+    add_line(corners[0], corners[1]);
+    add_line(corners[1], corners[2]);
+    add_line(corners[2], corners[3]);
+    add_line(corners[3], corners[0]);
 
-    add_line(transformed_corners[4], transformed_corners[5]);
-    add_line(transformed_corners[5], transformed_corners[6]);
-    add_line(transformed_corners[6], transformed_corners[7]);
-    add_line(transformed_corners[7], transformed_corners[4]);
+    // Draw far plane
+    add_line(corners[4], corners[5]);
+    add_line(corners[5], corners[6]);
+    add_line(corners[6], corners[7]);
+    add_line(corners[7], corners[4]);
 
-    add_line(transformed_corners[0], transformed_corners[4]);
-    add_line(transformed_corners[1], transformed_corners[5]);
-    add_line(transformed_corners[2], transformed_corners[6]);
-    add_line(transformed_corners[3], transformed_corners[7]);
+    // Draw connecting lines
+    add_line(corners[0], corners[4]);
+    add_line(corners[1], corners[5]);
+    add_line(corners[2], corners[6]);
+    add_line(corners[3], corners[7]);
 
     marker_pub_->publish(marker);
 }
 
 void ExplorationManagerNode::camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
-    ImageProperties image_properties;
-    image_properties.width = msg->width;
-    image_properties.height = msg->height;
-    image_properties.min_depth = this->get_parameter("voxel_mapping.min_depth").as_double();
-    image_properties.max_depth = this->get_parameter("voxel_mapping.max_depth").as_double();
+    uint32_t width = msg->width;
+    uint32_t height = msg->height;
     float fx = msg->k[0];
     float fy = msg->k[4];
     float cx = msg->k[2];
     float cy = msg->k[5];
-    image_properties.fx = fx;
-    image_properties.fy = fy;
-    image_properties.cx = cx;
-    image_properties.cy = cy;
-    exploration_manager_.set_image_properties(image_properties);
-    
+
+    mapper_->set_camera_properties(fx, fy, cx, cy, width, height);
+
     camera_info_received_ = true;
-    RCLCPP_INFO(this->get_logger(), "fx: %.2f, fy: %.2f, cx: %.2f, cy: %.2f", fx, fy, cx, cy);
+    spdlog::info("Camera info received: width: {}, height: {}, fx: {}, fy: {}, cx: {}, cy: {}",
+                 width, height, fx, fy, cx, cy);
     camera_info_sub_.reset();
-}
-
-void ExplorationManagerNode::dvl_altitude_callback(const vortex_msgs::msg::DVLAltitude::SharedPtr msg) {
-    exploration_manager_.set_dvl_altitude(msg->altitude);
-}
-
-void ExplorationManagerNode::publish_slice(const std::vector<float>& slice, const Eigen::VectorXi& aabb_indices) {
-    sensor_msgs::msg::PointCloud2 cloud_msg;
-    cloud_msg.header.stamp = this->get_clock()->now();
-    cloud_msg.header.frame_id = map_frame_;
-    cloud_msg.is_dense = false;
-
-    int width = aabb_indices[1] - aabb_indices[0] + 1;
-    int height = aabb_indices[3] - aabb_indices[2] + 1;
-
-    sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
-    modifier.setPointCloud2Fields(
-        4,
-        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
-    );
-
-    modifier.resize(width * height);
-    sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
-    sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
-
-    double voxel_resolution_ = this->get_parameter("voxel_mapping.grid_resolution").as_double();
-    int min_z = aabb_indices[4];
-    int max_z = aabb_indices[5];
-    float z_value = static_cast<float>(min_z + max_z)/2 * voxel_resolution_;
-
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            int idx = y * width + x;
-            if (idx < slice.size()) {
-                *iter_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
-                *iter_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
-                *iter_z = z_value;
-                if(slice[idx] == 1.0) {
-                    *iter_intensity = 100.0;
-                } else if(slice[idx] == 0.0) {
-                    *iter_intensity = 0.0;
-                } else {
-                    *iter_intensity = -100.0;
-                }
-                ++iter_x;
-                ++iter_y;
-                ++iter_z;
-                ++iter_intensity;
-            }
-        }
-    }
-
-    pointcloud_slice_pub_->publish(cloud_msg);
-}
-
-void ExplorationManagerNode::publish_esdf(const std::vector<float>& esdf, const Eigen::VectorXi& aabb_indices) {
-    sensor_msgs::msg::PointCloud2 cloud_msg;
-    cloud_msg.header.stamp = this->get_clock()->now();
-    cloud_msg.header.frame_id = map_frame_;
-    cloud_msg.is_dense = false;
-
-    int width = aabb_indices[1] - aabb_indices[0] + 1;
-    int height = aabb_indices[3] - aabb_indices[2] + 1;
-
-    sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
-    modifier.setPointCloud2Fields(
-        4,
-        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
-    );
-
-    modifier.resize(width * height);
-    sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
-    sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
-
-    double voxel_resolution_ = this->get_parameter("voxel_mapping.grid_resolution").as_double();
-    int min_z = aabb_indices[4];
-    int max_z = aabb_indices[5];
-    float z_value = static_cast<float>(min_z + max_z)/2 * voxel_resolution_;
-
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            int idx = y * width + x;
-            if (idx < esdf.size()) {
-                *iter_x = static_cast<float>(aabb_indices[0] + x) * voxel_resolution_;
-                *iter_y = static_cast<float>(aabb_indices[2] + y) * voxel_resolution_;
-                *iter_z = z_value;
-                *iter_intensity = esdf[idx];
-                ++iter_x;
-                ++iter_y;
-                ++iter_z;
-                ++iter_intensity;
-            }
-        }
-    }
-
-    pointcloud_esdf_pub_->publish(cloud_msg);
 }
 
 RCLCPP_COMPONENTS_REGISTER_NODE(ExplorationManagerNode)
