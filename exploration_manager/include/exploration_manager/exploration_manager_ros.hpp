@@ -20,19 +20,6 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 
-struct MapperParams {
-    size_t chunk_capacity;
-    float resolution;
-    float min_depth;
-    float max_depth;
-    int log_odds_occupied;
-    int log_odds_free;
-    int log_odds_min;
-    int log_odds_max;
-    int occupancy_threshold;
-    int free_threshold;
-};
-
 class ExplorationManagerNode : public rclcpp::Node {
    public:
     ExplorationManagerNode(const rclcpp::NodeOptions& options);
@@ -83,9 +70,10 @@ class ExplorationManagerNode : public rclcpp::Node {
     std::string map_frame_;
     std::string optical_frame_;
     float orca_z_pos_ = 0.0f;
+    size_t map_query_count_ = 0;
 
     std::unique_ptr<voxel_mapping::VoxelMapping> mapper_;
-    MapperParams mapper_params_;
+    voxel_mapping::VoxelMappingParams mapper_params_;
     voxel_mapping::AABB last_aabb_;
 
     Eigen::Matrix4f map_to_odom_tf_;

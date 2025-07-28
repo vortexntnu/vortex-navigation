@@ -84,7 +84,7 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
 }
 
 void ExplorationManagerNode::initialize_mapper_params() {
-    MapperParams mapper_params;
+    voxel_mapping::VoxelMappingParams mapper_params;
     mapper_params.chunk_capacity = this->declare_parameter<int>("voxel_mapping.chunk_capacity");
     mapper_params.resolution = this->declare_parameter<double>("voxel_mapping.grid_resolution");
     mapper_params.min_depth = this->declare_parameter<double>("voxel_mapping.min_depth");
@@ -98,7 +98,7 @@ void ExplorationManagerNode::initialize_mapper_params() {
 
     mapper_params_ = mapper_params;
 
-    mapper_ = std::make_unique<voxel_mapping::VoxelMapping>(mapper_params_.chunk_capacity, mapper_params_.resolution, mapper_params_.min_depth, mapper_params_.max_depth, mapper_params_.log_odds_occupied, mapper_params_.log_odds_free, mapper_params_.log_odds_min, mapper_params_.log_odds_max, mapper_params_.occupancy_threshold, mapper_params_.free_threshold);
+    mapper_ = std::make_unique<voxel_mapping::VoxelMapping>(mapper_params_);
 }
 
 geometry_msgs::msg::TransformStamped ExplorationManagerNode::compute_map_odom_transform() {
@@ -175,6 +175,11 @@ void ExplorationManagerNode::timer_callback() {
         spdlog::warn("AABB size is zero, skipping processing.");
         return;
     }
+    if (map_query_count_ % 10 == 0) {
+        mapper_->query_free_chunk_capacity();
+    }
+    map_query_count_++;
+
     std::vector<int> chunk;
     try {
         chunk = mapper_->get_3d_block(aabb);
