@@ -7,10 +7,13 @@
     depth_image_sub_topic: "/depth_cam/image_depth"
     camera_info_sub_topic: "/depth_cam/camera_info"
     odom_sub_topic: "/orca/odom"
-    voxelcloud_pub_topic: "/voxel_cloud"
     camera_view_visualization_pub_topic: "/camera_view"
-
     timer_period_ms: 100
+
+    grid_block_pub_topic: "/grid_block"
+    edt_block_pub_topic: "/edt_block"
+    grid_slices_pub_topic: "/grid_slices"
+    edt_slices_pub_topic: "/edt_slices"
 
     voxel_mapping:
       chunk_capacity: 1000
@@ -23,4 +26,5 @@
       log_odds_max: 6
       occupancy_threshold: 3
       free_threshold: -3
+      edt_max_distance: 5 # in voxels
 

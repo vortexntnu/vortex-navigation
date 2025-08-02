@@ -64,23 +64,24 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
         odom_sub_topic, qos,
         std::bind(&ExplorationManagerNode::odometry_callback, this, _1));
 
-    auto point_cloud_pub_topic = this->declare_parameter<std::string>("voxelcloud_pub_topic");
-    
-    point_cloud_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-        point_cloud_pub_topic, 10);
-
     auto marker_pub_topic = this->declare_parameter<std::string>("camera_view_visualization_pub_topic");
-
+    
     marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(marker_pub_topic, qos);
     
     auto timer_period_ms = this->declare_parameter<int>("timer_period_ms");
-
+    
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(timer_period_ms),
         std::bind(&ExplorationManagerNode::timer_callback, this));
 
-    pointcloud_esdf_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
-        "point_cloud_esdf", qos);
+    std::string grid_block_pub_topic = this->declare_parameter<std::string>("grid_block_pub_topic");
+    grid_block_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(grid_block_pub_topic, qos);
+    std::string edt_block_pub_topic = this->declare_parameter<std::string>("edt_block_pub_topic");
+    edt_block_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(edt_block_pub_topic, qos);
+    std::string grid_slices_pub_topic = this->declare_parameter<std::string>("grid_slices_pub_topic");
+    grid_slices_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(grid_slices_pub_topic, qos);
+    std::string edt_slices_pub_topic = this->declare_parameter<std::string>("edt_slices_pub_topic");
+    edt_slices_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(edt_slices_pub_topic, qos);
 }
 
 void ExplorationManagerNode::initialize_mapper_params() {
@@ -95,6 +96,7 @@ void ExplorationManagerNode::initialize_mapper_params() {
     mapper_params.log_odds_max = this->declare_parameter<int>("voxel_mapping.log_odds_max");
     mapper_params.occupancy_threshold = this->declare_parameter<int>("voxel_mapping.occupancy_threshold");
     mapper_params.free_threshold = this->declare_parameter<int>("voxel_mapping.free_threshold");
+    mapper_params.edt_max_distance = this->declare_parameter<int>("voxel_mapping.edt_max_distance");
 
     mapper_params_ = mapper_params;
 
@@ -180,119 +182,133 @@ void ExplorationManagerNode::timer_callback() {
     }
     map_query_count_++;
 
-    std::vector<int> chunk;
-    try {
-        chunk = mapper_->get_3d_block(aabb);
-    } catch (const std::exception &e) {
-        spdlog::error("Error getting 3D block: {}", e.what());
-        return;
+    if (grid_block_pub_->get_subscription_count() > 0) {
+        try {
+            std::vector<int> chunk = mapper_->extract_grid_block(aabb);
+            if (!chunk.empty()) {
+                publish_grid_block(chunk, aabb);
+            } else {
+                spdlog::warn("No data available for the AABB, skipping publishing.");
+            }
+        } catch (const std::exception &e) {
+            spdlog::error("Error getting 3D block: {}", e.what());
+        }
     }
-    
-    if (chunk.empty()) {
-        spdlog::warn("No data available for the AABB, skipping publishing.");
-        return;
-    }
-    publish_3d_chunk(chunk, aabb);
-    
-    voxel_mapping::AABB aabb_slice = aabb;
-    aabb_slice.min_corner_index.z = static_cast<int>(std::floor(orca_z_pos_ / mapper_params_.resolution));
-    aabb_slice.size.z = 1; // Extracting a single slice in the z dimension
 
-    std::vector<int> esdf_slice;
-    try {
-        mapper_->extract_esdf_slice(aabb_slice, esdf_slice);
-    } catch (const std::exception &e) {
-        spdlog::error("Error extracting ESDF slice: {}", e.what());
-        return;
+    if (edt_block_pub_->get_subscription_count() > 0) {
+        try {
+            std::vector<int> edt_block = mapper_->extract_edt_block(aabb);
+            if (!edt_block.empty()) {
+                publish_edt_block(edt_block, aabb);
+            } else {
+                spdlog::warn("EDT block is empty, skipping publishing.");
+            }
+        } catch (const std::exception &e) {
+            spdlog::error("Error extracting EDT block: {}", e.what());
+        }
     }
-    if (esdf_slice.empty()) {
-        spdlog::warn("ESDF slice is empty, skipping publishing.");
-        return;
-    }
-    publish_esdf_slice(esdf_slice, aabb_slice);
 
+    if (grid_slices_pub_->get_subscription_count() > 0 || edt_slices_pub_->get_subscription_count() > 0) {
+        voxel_mapping::SliceZIndices slice_indices;
+        slice_indices.indices[0] = aabb.min_corner_index.z + aabb.size.z / 4;
+        slice_indices.indices[1] = aabb.min_corner_index.z + aabb.size.z / 2;
+        slice_indices.indices[2] = aabb.min_corner_index.z + aabb.size.z * 3 / 4;
+        slice_indices.count = 3;
+
+        if (grid_slices_pub_->get_subscription_count() > 0) {
+            try {
+                std::vector<int> grid_slices = mapper_->extract_grid_slices(aabb, slice_indices);
+                if (!grid_slices.empty()) {
+                    publish_grid_slices(grid_slices, aabb, slice_indices);
+                } else {
+                    spdlog::warn("Grid slices are empty, skipping publishing.");
+                }
+            } catch (const std::exception &e) {
+                spdlog::error("Error extracting grid slices: {}", e.what());
+            }
+        }
+
+        if (edt_slices_pub_->get_subscription_count() > 0) {
+            try {
+                std::vector<int> edt_slices = mapper_->extract_edt_slice(aabb, slice_indices);
+                if (!edt_slices.empty()) {
+                    publish_edt_slices(edt_slices, aabb, slice_indices);
+                } else {
+                    spdlog::warn("EDT slices are empty, skipping publishing.");
+                }
+            } catch (const std::exception &e) {
+                spdlog::error("Error extracting EDT slices: {}", e.what());
+            }
+        }
+    }
 }
 
-void ExplorationManagerNode::publish_3d_chunk(const std::vector<int>& chunk, const voxel_mapping::AABB& aabb) {
-    struct Point {
-        float x, y, z, intensity;
-    };
-    std::vector<Point> points_to_publish;
+void ExplorationManagerNode::publish_grid_block(const std::vector<int>& block, const voxel_mapping::AABB& aabb) {
+    if (block.empty()) {
+        spdlog::warn("Grid block is empty, skipping publishing.");
+        return;
+    }
 
-    int aabb_min_x = aabb.min_corner_index.x;
-    int aabb_min_y = aabb.min_corner_index.y;
-    int aabb_min_z = aabb.min_corner_index.z;
-    int aabb_size_x = aabb.size.x;
-    int aabb_size_y = aabb.size.y;
-    int aabb_size_z = aabb.size.z;
+    sensor_msgs::msg::PointCloud2 grid_msg;
+    grid_msg.header.stamp = this->get_clock()->now();
+    grid_msg.header.frame_id = map_frame_;
+    grid_msg.is_dense = true;
 
-    double grid_resolution = mapper_params_.resolution;
-    int occupancy_threshold = mapper_params_.occupancy_threshold;
+    sensor_msgs::PointCloud2Modifier modifier(grid_msg);
+    modifier.setPointCloud2Fields(
+        4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
 
-    for (int z = 0; z < aabb_size_z; ++z) {
-        for (int y = 0; y < aabb_size_y; ++y) {
-            for (int x = 0; x < aabb_size_x; ++x) {
-                size_t idx = z * (aabb_size_x * aabb_size_y) + y * aabb_size_x + x;
-                if (idx < chunk.size()) {
-                    int value = chunk[idx];
-                    if (value > occupancy_threshold) {
-                        Point p;
-                        p.x = static_cast<float>(x + aabb_min_x) * grid_resolution;
-                        p.y = static_cast<float>(y + aabb_min_y) * grid_resolution;
-                        p.z = static_cast<float>(z + aabb_min_z) * grid_resolution;
-                        p.intensity = static_cast<float>(value);
-                        points_to_publish.push_back(p);
+    size_t total_points = block.size();
+    modifier.resize(total_points);
+
+    sensor_msgs::PointCloud2Iterator<float> iter_x(grid_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(grid_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(grid_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(grid_msg, "intensity");
+
+    float resolution = mapper_params_.resolution;
+    int size_x = aabb.size.x;
+    int size_y = aabb.size.y;
+    int size_z = aabb.size.z;
+
+    for (int z = 0; z < size_z; ++z) {
+        for (int y = 0; y < size_y; ++y) {
+            for (int x = 0; x < size_x; ++x) {
+                int idx = z * (size_x * size_y) + y * size_x + x;
+                if (idx < total_points) {
+                    int value = block[idx];
+                    if (value > mapper_params_.occupancy_threshold) {
+                        *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
+                        *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
+                        *iter_z = static_cast<float>(z + aabb.min_corner_index.z) * resolution;
+                        *iter_intensity = static_cast<float>(value);
                     }
+                    ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
                 }
             }
         }
     }
 
-    sensor_msgs::msg::PointCloud2 cloud_msg;
-    cloud_msg.header.stamp = this->get_clock()->now();
-    cloud_msg.header.frame_id = map_frame_;
-    cloud_msg.is_dense = true;
-
-    sensor_msgs::PointCloud2Modifier modifier(cloud_msg);
-    modifier.setPointCloud2Fields(
-        4,
-        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
-    );
-
-    modifier.resize(points_to_publish.size());
-
-    sensor_msgs::PointCloud2Iterator<float> iter_x(cloud_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(cloud_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(cloud_msg, "z");
-    sensor_msgs::PointCloud2Iterator<float> iter_intensity(cloud_msg, "intensity");
-
-    for (const auto& point : points_to_publish) {
-        *iter_x = point.x;
-        *iter_y = point.y;
-        *iter_z = point.z;
-        *iter_intensity = point.intensity;
-
-        ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
-    }
-
-    point_cloud_pub_->publish(cloud_msg);
+    grid_block_pub_->publish(grid_msg);
 }
 
-void ExplorationManagerNode::publish_esdf_slice(const std::vector<int>& esdf_slice, const voxel_mapping::AABB& aabb) {
-    if (esdf_slice.empty()) {
-        spdlog::warn("ESDF slice is empty, skipping publishing.");
+void ExplorationManagerNode::publish_edt_block(const std::vector<int>& edt_block, const voxel_mapping::AABB& aabb) {
+    if (edt_block.empty()) {
+        spdlog::warn("EDT block is empty, skipping publishing.");
         return;
     }
 
-    sensor_msgs::msg::PointCloud2 esdf_msg;
-    esdf_msg.header.stamp = this->get_clock()->now();
-    esdf_msg.header.frame_id = map_frame_;
-    esdf_msg.is_dense = true;
+    sensor_msgs::msg::PointCloud2 edt_msg;
+    edt_msg.header.stamp = this->get_clock()->now();
+    edt_msg.header.frame_id = map_frame_;
+    edt_msg.is_dense = true;
 
-    sensor_msgs::PointCloud2Modifier modifier(esdf_msg);
+    sensor_msgs::PointCloud2Modifier modifier(edt_msg);
     modifier.setPointCloud2Fields(
         4,
         "x", 1, sensor_msgs::msg::PointField::FLOAT32,
@@ -301,33 +317,147 @@ void ExplorationManagerNode::publish_esdf_slice(const std::vector<int>& esdf_sli
         "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
     );
 
-    size_t total_points = esdf_slice.size();
+    size_t total_points = edt_block.size();
     modifier.resize(total_points);
 
-    sensor_msgs::PointCloud2Iterator<float> iter_x(esdf_msg, "x");
-    sensor_msgs::PointCloud2Iterator<float> iter_y(esdf_msg, "y");
-    sensor_msgs::PointCloud2Iterator<float> iter_z(esdf_msg, "z");
-    sensor_msgs::PointCloud2Iterator<float> iter_intensity(esdf_msg, "intensity");
+    sensor_msgs::PointCloud2Iterator<float> iter_x(edt_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(edt_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(edt_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(edt_msg, "intensity");
 
     float resolution = mapper_params_.resolution;
     int size_x = aabb.size.x;
     int size_y = aabb.size.y;
+    int size_z = aabb.size.z;
 
-    for (int y = 0; y < size_y; ++y) {
-        for (int x = 0; x < size_x; ++x) {
-            int idx = y * size_x + x;
-            if (idx < total_points) {
-                int value = esdf_slice[idx];
-                *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
-                *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
-                *iter_z = static_cast<float>(aabb.min_corner_index.z) * resolution;
-                *iter_intensity = static_cast<float>(value);
-                ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
+    for (int z = 0; z < size_z; ++z) {
+        for (int y = 0; y < size_y; ++y) {
+            for (int x = 0; x < size_x; ++x) {
+                int idx = z * (size_x * size_y) + y * size_x + x;
+                if (idx < total_points) {
+                    int value = edt_block[idx];
+                    if (value < 75) {
+                        *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
+                        *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
+                        *iter_z = static_cast<float>(z + aabb.min_corner_index.z) * resolution;
+                        *iter_intensity = static_cast<float>(value);
+                    }
+                    ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
+                }
             }
         }
     }
 
-    pointcloud_esdf_pub_->publish(esdf_msg);
+    edt_block_pub_->publish(edt_msg);
+}
+
+void ExplorationManagerNode::publish_grid_slices(const std::vector<voxel_mapping::VoxelType>& grid_slices, 
+                             const voxel_mapping::AABB& aabb, 
+                             const voxel_mapping::SliceZIndices& slice_indices) {
+    if (grid_slices.empty()) {
+        spdlog::warn("Grid slices are empty, skipping publishing.");
+        return;
+    }
+    sensor_msgs::msg::PointCloud2 grid_slices_msg;
+    grid_slices_msg.header.stamp = this->get_clock()->now();
+    grid_slices_msg.header.frame_id = map_frame_;
+    grid_slices_msg.is_dense = true;
+    sensor_msgs::PointCloud2Modifier modifier(grid_slices_msg);
+    modifier.setPointCloud2Fields(
+        4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
+
+    size_t total_points = grid_slices.size();
+    modifier.resize(total_points);
+
+    sensor_msgs::PointCloud2Iterator<float> iter_x(grid_slices_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(grid_slices_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(grid_slices_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(grid_slices_msg, "intensity");
+
+    float resolution = mapper_params_.resolution;
+    int size_x = aabb.size.x;
+    int size_y = aabb.size.y;
+    int size_z = slice_indices.count;
+
+    for (int z = 0; z < size_z; ++z) {
+        for (int y = 0; y < size_y; ++y) {
+            for (int x = 0; x < size_x; ++x) {
+                int idx = z * (size_x * size_y) + y * size_x + x;
+                if (idx < total_points) {
+                    int value = grid_slices[idx];
+                    if (value > mapper_params_.occupancy_threshold) {
+                        *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
+                        *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
+                        *iter_z = static_cast<float>(slice_indices.indices[z]) * resolution;
+                        *iter_intensity = static_cast<float>(value);
+                    }
+                    ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
+                }
+            }
+        }
+    }
+
+    grid_slices_pub_->publish(grid_slices_msg);
+}
+
+void ExplorationManagerNode::publish_edt_slices(const std::vector<int>& edt_slices,
+                            const voxel_mapping::AABB& aabb,
+                            const voxel_mapping::SliceZIndices& slice_indices) {
+    if (edt_slices.empty()) {
+        spdlog::warn("EDT slices are empty, skipping publishing.");
+        return;
+    }
+    sensor_msgs::msg::PointCloud2 edt_slices_msg;
+    edt_slices_msg.header.stamp = this->get_clock()->now();
+    edt_slices_msg.header.frame_id = map_frame_;
+    edt_slices_msg.is_dense = true;
+    sensor_msgs::PointCloud2Modifier modifier(edt_slices_msg);
+    modifier.setPointCloud2Fields(
+        4,
+        "x", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "y", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "z", 1, sensor_msgs::msg::PointField::FLOAT32,
+        "intensity", 1, sensor_msgs::msg::PointField::FLOAT32
+    );
+
+    size_t total_points = edt_slices.size();
+    modifier.resize(total_points);
+    sensor_msgs::PointCloud2Iterator<float> iter_x(edt_slices_msg, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(edt_slices_msg, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(edt_slices_msg, "z");
+    sensor_msgs::PointCloud2Iterator<float> iter_intensity(edt_slices_msg, "intensity");
+
+    float resolution = mapper_params_.resolution;
+    int size_x = aabb.size.x;
+    int size_y = aabb.size.y;
+    int size_z = slice_indices.count;
+
+    int max_dim_square = std::max(size_x, size_y) * std::max(size_x, size_y);
+
+    for (int z = 0; z < size_z; ++z) {
+        for (int y = 0; y < size_y; ++y) {
+            for (int x = 0; x < size_x; ++x) {
+                int idx = z * (size_x * size_y) + y * size_x + x;
+                if (idx < total_points) {
+                    int value = edt_slices[idx];
+                    if (value < max_dim_square) {
+                        *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
+                        *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
+                        *iter_z = static_cast<float>(slice_indices.indices[z]) * resolution;
+                        *iter_intensity = static_cast<float>(value);
+                    }
+                    ++iter_x; ++iter_y; ++iter_z; ++iter_intensity;
+                }
+            }
+        }
+    }
+
+    edt_slices_pub_->publish(edt_slices_msg);
 }
 
 void ExplorationManagerNode::publish_aabb_marker(const voxel_mapping::AABB& aabb) {

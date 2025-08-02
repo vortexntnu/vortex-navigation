@@ -38,9 +38,17 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     void publish_frustum_marker(const voxel_mapping::Frustum& frustum);
 
-    void publish_3d_chunk(const std::vector<int>& chunk, const voxel_mapping::AABB& aabb);
+    void publish_grid_block(const std::vector<int>& block, const voxel_mapping::AABB& aabb);
+    
+    void publish_edt_block(const std::vector<int>& edt_block, const voxel_mapping::AABB& aabb);
 
-    void publish_esdf_slice(const std::vector<int>& esdf_slice, const voxel_mapping::AABB& aabb);
+    void publish_grid_slices(const std::vector<voxel_mapping::VoxelType>& grid_slices, 
+                             const voxel_mapping::AABB& aabb, 
+                             const voxel_mapping::SliceZIndices& slice_indices);
+
+    void publish_edt_slices(const std::vector<int>& edt_slices,
+                            const voxel_mapping::AABB& aabb,
+                            const voxel_mapping::SliceZIndices& slice_indices);
 
     geometry_msgs::msg::TransformStamped compute_map_odom_transform();
 
@@ -57,9 +65,13 @@ class ExplorationManagerNode : public rclcpp::Node {
 
    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
    
-   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr point_cloud_pub_;
+   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr grid_block_pub_;
       
-   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_esdf_pub_;
+   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr edt_block_pub_;
+
+   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr grid_slices_pub_;
+
+   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr edt_slices_pub_;
    
    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
    
