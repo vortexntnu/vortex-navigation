@@ -336,7 +336,7 @@ void ExplorationManagerNode::publish_edt_block(const std::vector<int>& edt_block
                 int idx = z * (size_x * size_y) + y * size_x + x;
                 if (idx < total_points) {
                     int value = edt_block[idx];
-                    if (value < 75) {
+                    if (value > 0) {
                         *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
                         *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
                         *iter_z = static_cast<float>(z + aabb.min_corner_index.z) * resolution;
@@ -445,7 +445,7 @@ void ExplorationManagerNode::publish_edt_slices(const std::vector<int>& edt_slic
                 int idx = z * (size_x * size_y) + y * size_x + x;
                 if (idx < total_points) {
                     int value = edt_slices[idx];
-                    if (value < max_dim_square) {
+                    if (value > 0) {
                         *iter_x = static_cast<float>(x + aabb.min_corner_index.x) * resolution;
                         *iter_y = static_cast<float>(y + aabb.min_corner_index.y) * resolution;
                         *iter_z = static_cast<float>(slice_indices.indices[z]) * resolution;
