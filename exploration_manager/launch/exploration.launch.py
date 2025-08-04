@@ -11,12 +11,22 @@ config_file = os.path.join(
     )
 
 def generate_launch_description():
-    node = Node(
-        package="exploration_manager",
-        executable="exploration_manager_node",
-        name="exploration_manager_node",
-        parameters=[config_file
+    container = ComposableNodeContainer(
+        name='voxel_mapping_container',
+        namespace='',
+        package='rclcpp_components',
+        executable='component_container_mt',
+        composable_node_descriptions=[
+            ComposableNode(
+                package='exploration_manager',
+                plugin='ExplorationManagerNode',
+                name='exploration_manager_node',
+                parameters=[
+                    config_file
+                ]
+            ),
         ],
-        output="screen",
+        output='screen',
     )
-    return LaunchDescription([node])
+
+    return LaunchDescription([container])

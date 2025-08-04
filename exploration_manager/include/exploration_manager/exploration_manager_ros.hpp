@@ -38,15 +38,15 @@ class ExplorationManagerNode : public rclcpp::Node {
 
     void publish_frustum_marker(const voxel_mapping::Frustum& frustum);
 
-    void publish_grid_block(const std::vector<int>& block, const voxel_mapping::AABB& aabb);
-    
-    void publish_edt_block(const std::vector<int>& edt_block, const voxel_mapping::AABB& aabb);
+    void publish_grid_block(const int* block_data, size_t size_bytes, const voxel_mapping::AABB& aabb);
 
-    void publish_grid_slices(const std::vector<voxel_mapping::VoxelType>& grid_slices, 
-                             const voxel_mapping::AABB& aabb, 
+    void publish_edt_block(const int* edt_block_data, size_t size_bytes, const voxel_mapping::AABB& aabb);
+
+    void publish_grid_slices(const int* grid_slices_data, size_t size_bytes,
+                             const voxel_mapping::AABB& aabb,
                              const voxel_mapping::SliceZIndices& slice_indices);
 
-    void publish_edt_slices(const std::vector<int>& edt_slices,
+    void publish_edt_slices(const int* edt_slices_data, size_t size_bytes,
                             const voxel_mapping::AABB& aabb,
                             const voxel_mapping::SliceZIndices& slice_indices);
 
@@ -76,6 +76,9 @@ class ExplorationManagerNode : public rclcpp::Node {
    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
    
    rclcpp::TimerBase::SharedPtr timer_;
+
+   rclcpp::CallbackGroup::SharedPtr callback_group_sub_;
+   rclcpp::CallbackGroup::SharedPtr callback_group_timer_;
    
    bool camera_info_received_ = false;
     std::string odom_frame_;
