@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(exploration_manager)
 
+option(USE_NVTX "Enable NVTX profiling support" OFF)
+
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -29,6 +31,29 @@ set(LIB_NAME "${PROJECT_NAME}_component")
 add_library(${LIB_NAME} SHARED
   src/exploration_manager_ros.cpp
 )
+
+
+if(USE_NVTX)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64") # Jetson ARM 64-bit
+    set(NVTX_LIBRARY_PATH /usr/lib/aarch64-linux-gnu/libnvToolsExt.so)
+    set(NVTX_INCLUDE_DIR /usr/include)
+  else() # Desktop x86_64 
+    set(NVTX_LIBRARY_PATH /usr/local/cuda-12.8/targets/x86_64-linux/lib/libnvToolsExt.so)
+    set(NVTX_INCLUDE_DIR /usr/local/cuda-12.8/include)
+  endif()
+
+  if(EXISTS ${NVTX_LIBRARY_PATH})
+    message(STATUS "NVTX enabled. Found at ${NVTX_LIBRARY_PATH}")
+    set(NVTX_LIBRARY ${NVTX_LIBRARY_PATH})
+
+    target_link_libraries(${LIB_NAME} PRIVATE ${NVTX_LIBRARY})
+    target_compile_definitions(${LIB_NAME} PRIVATE USE_NVTX)
+    target_include_directories(${LIB_NAME} PRIVATE ${NVTX_INCLUDE_DIR})
+
+  else()
+    message(FATAL_ERROR "NVTX requested but not found at ${NVTX_LIBRARY_PATH}")
+  endif()
+endif()
 
 target_link_libraries(${LIB_NAME} PUBLIC voxel_mapping::voxel_mapping
   spdlog::spdlog

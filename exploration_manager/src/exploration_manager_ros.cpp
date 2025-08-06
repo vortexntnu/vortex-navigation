@@ -1,5 +1,8 @@
 #include <exploration_manager/exploration_manager_ros.hpp>
 #include <spdlog/spdlog.h>
+#ifdef USE_NVTX
+    #include <nvtx3/nvToolsExt.h>
+#endif
 
 using std::placeholders::_1;
 
@@ -151,6 +154,9 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
     if (!camera_info_received_) {
         return;
     }
+    #ifdef USE_NVTX
+        nvtxRangePushA("Depth Image Callback");
+    #endif
     geometry_msgs::msg::TransformStamped transform;
     try {
         transform = tf_buffer_->lookupTransform(map_frame_, optical_frame_, msg->header.stamp);
@@ -176,6 +182,9 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
     voxel_mapping::Frustum frustum = mapper_->get_frustum();
     publish_frustum_marker(frustum);
 
+    #ifdef USE_NVTX
+        nvtxRangePop(); // Depth Image Callback
+    #endif
 }
 
 void ExplorationManagerNode::timer_callback() {
@@ -195,11 +204,25 @@ void ExplorationManagerNode::timer_callback() {
 
     if (grid_block_pub_->get_subscription_count() > 0) {
         try {
-            voxel_mapping::ExtractionResult result = mapper_->extract_grid_block(aabb);
-            
-            result.wait();
-            const int* block_data = result.data<int>();
+            #ifdef USE_NVTX
+                nvtxRangePushA("Block Extraction (Total)");
+                nvtxRangePushA("Block Extraction (Launch)");
+            #endif
 
+            voxel_mapping::ExtractionResult result = mapper_->extract_grid_block(aabb);
+
+            #ifdef USE_NVTX
+                nvtxRangePop(); // Block Extraction (Launch)
+            #endif
+
+            result.wait();
+
+            #ifdef USE_NVTX
+                nvtxRangePop(); // Block Extraction (Total)
+            #endif
+
+            const int* block_data = result.data<int>();
+                
             if (block_data != nullptr) {
                 publish_grid_block(block_data, result.size_bytes(), aabb);
             } else {
@@ -213,8 +236,22 @@ void ExplorationManagerNode::timer_callback() {
 
     if (edt_block_pub_->get_subscription_count() > 0) {
         try {
+            #ifdef USE_NVTX
+                nvtxRangePushA("EDT Block Extraction (Total)");
+                nvtxRangePushA("EDT Block Extraction (Launch)");
+            #endif
+
             voxel_mapping::ExtractionResult result = mapper_->extract_edt_block(aabb);
+
+            #ifdef USE_NVTX
+                nvtxRangePop(); // EDT Block Extraction (Launch)
+            #endif
+
             result.wait();
+
+            #ifdef USE_NVTX
+                nvtxRangePop(); // EDT Block Extraction (Total)
+            #endif
             const int* edt_block_data = result.data<int>();
             
             if (edt_block_data != nullptr) {
@@ -236,9 +273,24 @@ void ExplorationManagerNode::timer_callback() {
 
         if (grid_slices_pub_->get_subscription_count() > 0) {
             try {
+                #ifdef USE_NVTX
+                    nvtxRangePushA("Slice Extraction (Total)");
+                    nvtxRangePushA("Slice Extraction (Launch)");
+                #endif
+
                 voxel_mapping::ExtractionResult result = mapper_->extract_grid_slices(aabb, slice_indices);
+
+                #ifdef USE_NVTX
+                    nvtxRangePop(); // Slice Extraction (Launch)
+                #endif
+
                 result.wait();
+
+                #ifdef USE_NVTX
+                    nvtxRangePop(); // Slice Extraction (Total)
+                #endif
                 const int* grid_slices_data = result.data<int>();
+                
                 if (grid_slices_data != nullptr) {
                     publish_grid_slices(grid_slices_data, result.size_bytes(), aabb, slice_indices);
                 } else {
@@ -251,9 +303,24 @@ void ExplorationManagerNode::timer_callback() {
 
         if (edt_slices_pub_->get_subscription_count() > 0) {
             try {
-                voxel_mapping::ExtractionResult result = mapper_->extract_edt_slice(aabb, slice_indices);
+                #ifdef USE_NVTX
+                    nvtxRangePushA("EDT Slice Extraction (Total)");
+                    nvtxRangePushA("EDT Slice Extraction (Launch)");
+                #endif
+
+                voxel_mapping::ExtractionResult result = mapper_->extract_edt_slices(aabb, slice_indices);
+
+                #ifdef USE_NVTX
+                    nvtxRangePop(); // EDT Slice Extraction (Launch)
+                #endif
+
                 result.wait();
+
+                #ifdef USE_NVTX
+                    nvtxRangePop(); // EDT Slice Extraction (Total)
+                #endif
                 const int* edt_slices_data = result.data<int>();
+                
                 if (edt_slices_data != nullptr) {
                     publish_edt_slices(edt_slices_data, result.size_bytes(), aabb, slice_indices);
                 } else {
