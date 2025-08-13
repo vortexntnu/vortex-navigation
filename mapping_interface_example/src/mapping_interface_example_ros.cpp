@@ -1,4 +1,4 @@
-#include <exploration_manager/exploration_manager_ros.hpp>
+#include <mapping_interface_example/mapping_interface_example_ros.hpp>
 #include <spdlog/spdlog.h>
 #ifdef USE_NVTX
     #include <nvtx3/nvToolsExt.h>
@@ -6,8 +6,8 @@
 
 using std::placeholders::_1;
 
-ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& options)
-    : Node("exploration_manager_node", options) {
+MappingInterfaceNode::MappingInterfaceNode(const rclcpp::NodeOptions& options)
+    : Node("mapping_interface_node", options) {
 
     initialize_mapper_params();
 
@@ -62,19 +62,19 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
         depth_sub_, *tf_buffer_, map_frame_, 10, 
         this->get_node_logging_interface(), this->get_node_clock_interface());
         
-    depth_filter_->registerCallback(std::bind(&ExplorationManagerNode::depth_image_callback, this, _1));
+    depth_filter_->registerCallback(std::bind(&MappingInterfaceNode::depth_image_callback, this, _1));
     
     auto camera_info_sub_topic = this->declare_parameter<std::string>("camera_info_sub_topic");
         
     camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         camera_info_sub_topic, qos,
-        std::bind(&ExplorationManagerNode::camera_info_callback, this, _1));
+        std::bind(&MappingInterfaceNode::camera_info_callback, this, _1));
 
     std::string odom_sub_topic = this->declare_parameter<std::string>("odom_sub_topic");
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         odom_sub_topic, 
         qos, 
-        std::bind(&ExplorationManagerNode::odometry_callback, this, _1),
+        std::bind(&MappingInterfaceNode::odometry_callback, this, _1),
         sub_options);
 
     auto marker_pub_topic = this->declare_parameter<std::string>("camera_view_visualization_pub_topic");
@@ -85,7 +85,7 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(timer_period_ms),
-        std::bind(&ExplorationManagerNode::timer_callback, this),
+        std::bind(&MappingInterfaceNode::timer_callback, this),
         callback_group_timer_);
 
     std::string grid_block_pub_topic = this->declare_parameter<std::string>("grid_block_pub_topic");
@@ -98,7 +98,7 @@ ExplorationManagerNode::ExplorationManagerNode(const rclcpp::NodeOptions& option
     edt_slices_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(edt_slices_pub_topic, qos);
 }
 
-void ExplorationManagerNode::initialize_mapper_params() {
+void MappingInterfaceNode::initialize_mapper_params() {
     voxel_mapping::VoxelMappingParams mapper_params;
     mapper_params.chunk_capacity = this->declare_parameter<int>("voxel_mapping.chunk_capacity");
     mapper_params.resolution = this->declare_parameter<double>("voxel_mapping.grid_resolution");
@@ -118,7 +118,7 @@ void ExplorationManagerNode::initialize_mapper_params() {
     mapper_ = std::make_unique<voxel_mapping::VoxelMapping>(mapper_params_);
 }
 
-geometry_msgs::msg::TransformStamped ExplorationManagerNode::compute_map_odom_transform() {
+geometry_msgs::msg::TransformStamped MappingInterfaceNode::compute_map_odom_transform() {
     geometry_msgs::msg::TransformStamped map_to_odom;
     map_to_odom.header.stamp = this->get_clock()->now();
     map_to_odom.header.frame_id = map_frame_;
@@ -147,11 +147,11 @@ geometry_msgs::msg::TransformStamped ExplorationManagerNode::compute_map_odom_tr
     return map_to_odom;
 }
 
-void ExplorationManagerNode::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+void MappingInterfaceNode::odometry_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     orca_z_pos_ = -msg->pose.pose.position.z;
 }
        
-void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image::ConstSharedPtr msg) {
+void MappingInterfaceNode::depth_image_callback(const sensor_msgs::msg::Image::ConstSharedPtr msg) {
     if (!camera_info_received_) {
         return;
     }
@@ -188,7 +188,7 @@ void ExplorationManagerNode::depth_image_callback(const sensor_msgs::msg::Image:
     #endif
 }
 
-void ExplorationManagerNode::timer_callback() {
+void MappingInterfaceNode::timer_callback() {
     if (!camera_info_received_) {
         return;
     }
@@ -341,7 +341,7 @@ void ExplorationManagerNode::timer_callback() {
     }
 }
 
-void ExplorationManagerNode::publish_grid_block(const int* block_data, size_t size_bytes, const voxel_mapping::AABB& aabb) {
+void MappingInterfaceNode::publish_grid_block(const int* block_data, size_t size_bytes, const voxel_mapping::AABB& aabb) {
     if (block_data == nullptr || size_bytes == 0) {
         spdlog::warn("Grid block data is empty, skipping publishing.");
         return;
@@ -395,7 +395,7 @@ void ExplorationManagerNode::publish_grid_block(const int* block_data, size_t si
     grid_block_pub_->publish(grid_msg);
 }
 
-void ExplorationManagerNode::publish_edt_block(const int* edt_block_data, size_t size_bytes, const voxel_mapping::AABB& aabb) {
+void MappingInterfaceNode::publish_edt_block(const int* edt_block_data, size_t size_bytes, const voxel_mapping::AABB& aabb) {
     if (edt_block_data == nullptr || size_bytes == 0) {
         spdlog::warn("EDT block data is empty, skipping publishing.");
         return;
@@ -449,7 +449,7 @@ void ExplorationManagerNode::publish_edt_block(const int* edt_block_data, size_t
     edt_block_pub_->publish(edt_msg);
 }
 
-void ExplorationManagerNode::publish_grid_slices(const int* grid_slices_data, size_t size_bytes, 
+void MappingInterfaceNode::publish_grid_slices(const int* grid_slices_data, size_t size_bytes, 
                              const voxel_mapping::AABB& aabb, 
                              const voxel_mapping::SliceZIndices& slice_indices) {
     if (grid_slices_data == nullptr || size_bytes == 0) {
@@ -503,7 +503,7 @@ void ExplorationManagerNode::publish_grid_slices(const int* grid_slices_data, si
     grid_slices_pub_->publish(grid_slices_msg);
 }
 
-void ExplorationManagerNode::publish_edt_slices(const int* edt_slices_data, size_t size_bytes,
+void MappingInterfaceNode::publish_edt_slices(const int* edt_slices_data, size_t size_bytes,
                             const voxel_mapping::AABB& aabb,
                             const voxel_mapping::SliceZIndices& slice_indices) {
     if (edt_slices_data == nullptr || size_bytes == 0) {
@@ -558,7 +558,7 @@ void ExplorationManagerNode::publish_edt_slices(const int* edt_slices_data, size
     edt_slices_pub_->publish(edt_slices_msg);
 }
 
-void ExplorationManagerNode::publish_aabb_marker(const voxel_mapping::AABB& aabb) {
+void MappingInterfaceNode::publish_aabb_marker(const voxel_mapping::AABB& aabb) {
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = map_frame_;
     marker.header.stamp = this->get_clock()->now();
@@ -603,7 +603,7 @@ void ExplorationManagerNode::publish_aabb_marker(const voxel_mapping::AABB& aabb
     marker_pub_->publish(marker);
 }
 
-void ExplorationManagerNode::publish_frustum_marker(const voxel_mapping::Frustum& frustum) {
+void MappingInterfaceNode::publish_frustum_marker(const voxel_mapping::Frustum& frustum) {
     visualization_msgs::msg::Marker marker;
     marker.header.frame_id = map_frame_;
     marker.header.stamp = this->get_clock()->now();
@@ -665,7 +665,7 @@ void ExplorationManagerNode::publish_frustum_marker(const voxel_mapping::Frustum
     marker_pub_->publish(marker);
 }
 
-void ExplorationManagerNode::camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
+void MappingInterfaceNode::camera_info_callback(const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
     uint32_t width = msg->width;
     uint32_t height = msg->height;
     float fx = msg->k[0];
@@ -681,4 +681,4 @@ void ExplorationManagerNode::camera_info_callback(const sensor_msgs::msg::Camera
     camera_info_sub_.reset();
 }
 
-RCLCPP_COMPONENTS_REGISTER_NODE(ExplorationManagerNode)
+RCLCPP_COMPONENTS_REGISTER_NODE(MappingInterfaceNode)

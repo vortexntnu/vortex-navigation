@@ -1,5 +1,5 @@
-#ifndef EXPLORATION_MANAGER_ROS_HPP
-#define EXPLORATION_MANAGER_ROS_HPP
+#ifndef MAPPING_INTERFACE_EXAMPLE_ROS_HPP
+#define MAPPING_INTERFACE_EXAMPLE_ROS_HPP
 
 #include "voxel-mapping/voxel_mapping.hpp"
 #include <rclcpp/rclcpp.hpp>
@@ -20,11 +20,11 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 
-class ExplorationManagerNode : public rclcpp::Node {
+class MappingInterfaceNode : public rclcpp::Node {
    public:
-    ExplorationManagerNode(const rclcpp::NodeOptions& options);
+    MappingInterfaceNode(const rclcpp::NodeOptions& options);
 
-    ~ExplorationManagerNode() {};
+    ~MappingInterfaceNode() {};
 
     void initialize_mapper_params();
 
@@ -96,4 +96,4 @@ class ExplorationManagerNode : public rclcpp::Node {
 
 };
 
-#endif  // EXPLORATION_MANAGER_ROS_HPP
+#endif  // MAPPING_INTERFACE_EXAMPLE_ROS_HPP

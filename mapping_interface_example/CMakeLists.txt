@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(exploration_manager)
+project(mapping_interface_example)
 
 option(USE_NVTX "Enable NVTX profiling support" OFF)
 
@@ -29,9 +29,8 @@ include_directories(include)
 set(LIB_NAME "${PROJECT_NAME}_component")
 
 add_library(${LIB_NAME} SHARED
-  src/exploration_manager_ros.cpp
+  src/mapping_interface_example_ros.cpp
 )
-
 
 if(USE_NVTX)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64") # Jetson ARM 64-bit
@@ -83,7 +82,7 @@ ament_target_dependencies(${LIB_NAME} PUBLIC
 
 rclcpp_components_register_node(
     ${LIB_NAME}
-    PLUGIN "ExplorationManagerNode"
+    PLUGIN "MappingInterfaceNode"
     EXECUTABLE ${PROJECT_NAME}_node
 )
 

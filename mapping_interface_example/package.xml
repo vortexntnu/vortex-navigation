@@ -1,7 +1,7 @@
 <package format="3">
-  <name>exploration_manager</name>
+  <name>mapping_interface_example</name>
   <version>0.2.0</version>
-  <description>Ros2 voxel mapping package</description>
+  <description>Ros2 package showcasing how to interact with the voxel_mapping library</description>
   <maintainer email="jorgen.fjermedal@hotmail.com">Jørgen Fjermedal</maintainer>
   <license>MIT</license>
 

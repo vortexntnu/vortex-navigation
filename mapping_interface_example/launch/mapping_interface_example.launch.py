@@ -5,9 +5,9 @@ from launch_ros.actions import Node, ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
 config_file = os.path.join(
-    get_package_share_directory("exploration_manager"),
+    get_package_share_directory("mapping_interface_example"),
     "config",
-    "exploration_manager_config.yaml",
+    "mapping_interface_example.yaml",
     )
 
 def generate_launch_description():
@@ -18,9 +18,9 @@ def generate_launch_description():
         executable='component_container_mt',
         composable_node_descriptions=[
             ComposableNode(
-                package='exploration_manager',
-                plugin='ExplorationManagerNode',
-                name='exploration_manager_node',
+                package='mapping_interface_example',
+                plugin='MappingInterfaceNode',
+                name='mapping_interface_node',
                 parameters=[
                     config_file
                 ]
