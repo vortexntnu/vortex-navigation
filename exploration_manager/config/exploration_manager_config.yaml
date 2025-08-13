@@ -27,4 +27,5 @@
       occupancy_threshold: 3
       free_threshold: -3
       edt_max_distance: 5 # in voxels
+      max_extraction_buffer_size_bytes: 8000000 #8MB
 

@@ -111,6 +111,7 @@ void ExplorationManagerNode::initialize_mapper_params() {
     mapper_params.occupancy_threshold = this->declare_parameter<int>("voxel_mapping.occupancy_threshold");
     mapper_params.free_threshold = this->declare_parameter<int>("voxel_mapping.free_threshold");
     mapper_params.edt_max_distance = this->declare_parameter<int>("voxel_mapping.edt_max_distance");
+    mapper_params.max_extraction_buffer_size_bytes = this->declare_parameter<int>("voxel_mapping.max_extraction_buffer_size_bytes");
 
     mapper_params_ = mapper_params;
 
@@ -192,7 +193,14 @@ void ExplorationManagerNode::timer_callback() {
         return;
     }
     voxel_mapping::AABB aabb = last_aabb_;
-    
+
+    size_t requested_size_bytes = aabb.size.x * aabb.size.y * aabb.size.z * sizeof(int);
+
+    if (requested_size_bytes > mapper_params_.max_extraction_buffer_size_bytes) {
+        size_t max_z = mapper_params_.max_extraction_buffer_size_bytes / (aabb.size.x * aabb.size.y * sizeof(int));
+        aabb.size.z = static_cast<int>(max_z);
+    }
+
     if (aabb.size.x == 0 || aabb.size.y == 0 || aabb.size.z == 0) {
         spdlog::warn("AABB size is zero, skipping processing.");
         return;
