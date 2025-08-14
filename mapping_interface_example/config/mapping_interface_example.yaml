@@ -1,0 +1,31 @@
+/**:
+  ros__parameters:
+    odom_frame: "odom"
+    map_frame: "map"
+    enu_to_ned: true
+    optical_frame: "Orca/Dcam"
+    depth_image_sub_topic: "/depth_cam/image_depth"
+    camera_info_sub_topic: "/depth_cam/camera_info"
+    odom_sub_topic: "/orca/odom"
+    camera_view_visualization_pub_topic: "/camera_view"
+    timer_period_ms: 100
+
+    grid_block_pub_topic: "/grid_block"
+    edt_block_pub_topic: "/edt_block"
+    grid_slices_pub_topic: "/grid_slices"
+    edt_slices_pub_topic: "/edt_slices"
+
+    voxel_mapping:
+      chunk_capacity: 1000
+      grid_resolution: 0.1
+      min_depth: 0.3
+      max_depth: 5.0
+      log_odds_occupied_update: 1
+      log_odds_free_update: -1
+      log_odds_min: -6
+      log_odds_max: 6
+      occupancy_threshold: 3
+      free_threshold: -3
+      edt_max_distance: 5 # in voxels
+      max_extraction_buffer_size_bytes: 8000000 #8MB
+
