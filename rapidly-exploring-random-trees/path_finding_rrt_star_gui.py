@@ -9,9 +9,8 @@ ROWS, COLS = 40, 40
 CELL_SIZE = WIDTH // COLS
 RADIUS = 1
 GOAL_RADIUS = 10
-STEP_SIZE = 8
+STEP_SIZE = 1
 RRT_ITERATIONS = 1000
-RRT_STAR_RADIUS = 5
 
 # Colors
 WHITE = (255, 255, 255)
@@ -228,7 +227,7 @@ def collision(cell_list):
 
     return False
 
-def run_rrt_star(esdf):
+def run_rrt(esdf):
     if not start or not goal:
         print("Start or goal not set")
         return
@@ -254,6 +253,18 @@ def run_rrt_star(esdf):
         cells_on_line = grid_line(nearest_node, new_node)
         
 
+        if node_distance <= STEP_SIZE:
+            cells_on_line = grid_line(nearest_node, random_point)
+            if not collision(cells_on_line):
+                tree.append({"pos": random_point, "parent": nearest_node})
+                node_list.append(random_point)
+                current_node = random_point
+
+        elif not collision(cells_on_line):
+            tree.append({"pos": new_node, "parent": nearest_node})
+            node_list.append(new_node)
+            current_node = new_node
+
         if distance_between_nodes(current_node, goal) <= GOAL_RADIUS:
             cells_current_node_to_goal = grid_line(current_node, goal)
             if not collision(cells_current_node_to_goal):
@@ -267,19 +278,6 @@ def run_rrt_star(esdf):
                     parent = [x["parent"] for x in tree if x["pos"] == parent][0]
                 print(final_path)
                 return final_path
-
-        if node_distance <= STEP_SIZE:
-            cells_on_line = grid_line(nearest_node, random_point)
-            if not collision(cells_on_line):
-                tree.append({"pos": random_point, "parent": nearest_node})
-                node_list.append(random_point)
-                current_node = random_point
-
-        elif not collision(cells_on_line):
-            tree.append({"pos": new_node, "parent": nearest_node})
-            node_list.append(new_node)
-            current_node = new_node
-
 
 
 # --- MAIN LOOP ---
@@ -332,7 +330,7 @@ while running:
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:  # Enter key
-                final_path = run_rrt_star(esdf)
+                final_path = run_rrt(esdf)
 
     screen.fill(WHITE)
     draw_grid(final_path)
